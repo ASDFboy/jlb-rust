@@ -1,0 +1,3 @@
+# Batch files are stored with Windows line endings exactly as they are.
+*.bat -text
+*.exe binary

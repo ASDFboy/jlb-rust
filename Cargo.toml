@@ -1,0 +1,19 @@
+[package]
+name = "jlb"
+version = "0.1.0"
+edition = "2021"
+authors = ["ASDFboy", "Claude"]
+description = "Interpreter for the .jlb programming language"
+repository = "https://github.com/ASDFboy/jlb-rust"
+
+[[bin]]
+name = "jlb"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

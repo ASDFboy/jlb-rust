@@ -1,0 +1,24 @@
+>> A number guessing game.  Run with:  jlb guess.jlb
+secret = RANDOM(1, 100)
+tries = 0
+PRINT("I'm thinking of a number from 1 to 100.")
+
+POINT ask
+guess = INPUT("Your guess: ")
+TRY {
+    guess = NUM(guess)
+} FAIL err {
+    PRINT("That's not a number, try again.")
+    GOTO ask
+}
+tries += 1
+
+IF guess < secret {
+    PRINT("Higher!")
+    GOTO ask
+} ELIF guess > secret {
+    PRINT("Lower!")
+    GOTO ask
+}
+
+PRINT("You got it in " + tries + " tries!")

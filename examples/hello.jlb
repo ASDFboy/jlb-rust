@@ -1,0 +1,10 @@
+>> Run with:  jlb hello.jlb
+PRINT("Hello, world!")
+
+name = INPUT("What's your name? ")
+PRINT("Nice to meet you, " + name + "!")
+
+fruits = ["apple", "pear", "orange"]
+FOR i, fruit IN fruits {
+    PRINT(i + ". " + fruit + " backwards is " + fruit * -1)
+}
