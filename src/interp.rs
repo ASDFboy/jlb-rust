@@ -46,6 +46,8 @@ pub struct Interp {
     pub start: Instant,
     pub last_delta: Instant,
     pub rng: u64,
+    /// Running for an editor: output is sent right away and crashes add a JSON report.
+    pub ide: bool,
     imported: HashSet<PathBuf>,
     loaded: HashMap<PathBuf, Value>,
 }
@@ -292,6 +294,7 @@ impl Interp {
             start: Instant::now(),
             last_delta: Instant::now(),
             rng: seed ^ 0x9E37_79B9_7F4A_7C15,
+            ide: false,
             imported: HashSet::new(),
             loaded: HashMap::new(),
         }
@@ -317,8 +320,57 @@ impl Interp {
             Ok(()) | Err(Fault::End) => 0,
             Err(Fault::Error(e)) => {
                 eprintln!("{}", report(&e));
+                if self.ide {
+                    eprintln!("{}{}", crate::ide::MARK, crate::ide::report_json(&e));
+                }
                 1
             }
+        }
+    }
+
+    // ---------- Quick-try sessions (jlb --repl) ----------
+
+    pub fn start_session(&mut self, dir: PathBuf) {
+        let env: Env = Rc::new(RefCell::new(OrdMap::new()));
+        let src = Rc::new(Source { name: "quick-try".into(), dir });
+        self.frames.push(Frame { func: None, scopes: Vec::new(), env, line: 0, src });
+    }
+
+    /// Runs a snippet in the session. A single expression gives back its value.
+    pub fn run_snippet(&mut self, text: &str) -> R<Option<Value>> {
+        // Tidy up after an earlier error, which can leave loop scopes or calls behind.
+        self.frames.truncate(1);
+        self.frames[0].scopes.clear();
+        let syntax = |msg: String, line: usize| {
+            Fault::Error(Box::new(ErrorInfo {
+                msg,
+                line,
+                file: "quick-try".into(),
+                captured: true,
+                traced: false,
+                frames: Vec::new(),
+                outside: Vec::new(),
+            }))
+        };
+        let toks = lexer::lex(text).map_err(|e| syntax(e.msg, e.line))?;
+        let prog = Parser::new(toks).program().map_err(|e| syntax(e.msg, e.line))?;
+        if let [s] = prog.as_slice() {
+            if let StmtKind::Expr(e) = &s.kind {
+                self.frame_mut().line = s.line;
+                return match self.eval(e) {
+                    // A command that gives back nothing (like PRINT) shows no result.
+                    Ok(Value::Null) if matches!(e, Expr::Call(..)) => Ok(None),
+                    Ok(v) => Ok(Some(v)),
+                    Err(mut f) => {
+                        self.capture(&mut f, s.line);
+                        Err(f)
+                    }
+                };
+            }
+        }
+        match self.exec_block(&prog)? {
+            Flow::Goto(n, line) => Err(self.goto_error(&n, line)),
+            _ => Ok(None),
         }
     }
 

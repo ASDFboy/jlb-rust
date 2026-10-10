@@ -18,11 +18,15 @@ pub enum Tok {
 pub struct Token {
     pub tok: Tok,
     pub line: usize,
+    /// Where the token starts, counted in characters from the start of the file.
+    pub pos: usize,
 }
 
 pub struct LexError {
     pub msg: String,
     pub line: usize,
+    /// Where the problem starts, counted in characters from the start of the file.
+    pub pos: usize,
 }
 
 pub const KEYWORDS: &[&str] = &[
@@ -74,17 +78,19 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
     let mut line = 1;
     let mut toks: Vec<Token> = Vec::new();
     let mut stack: Vec<char> = Vec::new();
-    let fail = |msg: String, line: usize| -> Result<Vec<Token>, LexError> { Err(LexError { msg, line }) };
+    let sp = std::cell::Cell::new(0usize);
+    let fail = |msg: String, line: usize| -> Result<Vec<Token>, LexError> { Err(LexError { msg, line, pos: sp.get() }) };
 
     while i < n {
         let ch = c[i];
+        sp.set(i);
         if ch == '\n' {
             let in_brackets = matches!(stack.last(), Some('(') | Some('['));
             let continues = matches!(toks.last(), Some(Token { tok: Tok::Op(o), .. })
                 if !matches!(*o, ")" | "]" | "}" | ";"));
             let fresh = matches!(toks.last(), None | Some(Token { tok: Tok::Newline, .. }));
             if !in_brackets && !continues && !fresh {
-                toks.push(Token { tok: Tok::Newline, line });
+                toks.push(Token { tok: Tok::Newline, line, pos: i });
             }
             line += 1;
             i += 1;
@@ -134,7 +140,7 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
             if j >= n {
                 return fail("this text is never closed with \"".into(), start);
             }
-            toks.push(Token { tok: Tok::Str(Rc::from(s.as_str())), line: start });
+            toks.push(Token { tok: Tok::Str(Rc::from(s.as_str())), line: start, pos: sp.get() });
             i = j + 1;
             continue;
         }
@@ -171,7 +177,7 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
             if j >= n {
                 return fail("this text is never closed with '".into(), start);
             }
-            toks.push(Token { tok: Tok::Str(Rc::from(s.as_str())), line: start });
+            toks.push(Token { tok: Tok::Str(Rc::from(s.as_str())), line: start, pos: sp.get() });
             i = j + 1;
             continue;
         }
@@ -223,7 +229,7 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
             if at(i).is_ascii_alphanumeric() || at(i) == '_' {
                 return fail("names can't start with a digit".into(), line);
             }
-            toks.push(Token { tok: Tok::Num(value), line });
+            toks.push(Token { tok: Tok::Num(value), line, pos: sp.get() });
             continue;
         }
         // Names, keywords and built-ins.
@@ -257,7 +263,7 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
             } else {
                 Tok::Name(Rc::from(word.as_str()))
             };
-            toks.push(Token { tok, line });
+            toks.push(Token { tok, line, pos: sp.get() });
             continue;
         }
         // Operators and punctuation.
@@ -281,13 +287,13 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
                     }
                     _ => {}
                 }
-                toks.push(Token { tok: Tok::Op(op), line });
+                toks.push(Token { tok: Tok::Op(op), line, pos: sp.get() });
                 i += op.chars().count();
             }
             None => return fail(format!("unexpected character '{}'", ch), line),
         }
     }
-    toks.push(Token { tok: Tok::Newline, line });
-    toks.push(Token { tok: Tok::Eof, line });
+    toks.push(Token { tok: Tok::Newline, line, pos: n });
+    toks.push(Token { tok: Tok::Eof, line, pos: n });
     Ok(toks)
 }

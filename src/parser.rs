@@ -9,6 +9,8 @@ use crate::lexer::{Tok, Token, BUILTINS};
 pub struct ParseError {
     pub msg: String,
     pub line: usize,
+    /// Where the problem starts (characters from the start of the file), when known.
+    pub pos: Option<usize>,
 }
 
 type PR<T> = Result<T, ParseError>;
@@ -72,7 +74,7 @@ impl Parser {
         matches!(self.peek(), Tok::Kw(x) if *x == k)
     }
     fn fail<T>(&self, msg: impl Into<String>) -> PR<T> {
-        Err(ParseError { msg: msg.into(), line: self.line() })
+        Err(ParseError { msg: msg.into(), line: self.line(), pos: Some(self.t[self.p].pos) })
     }
     fn expect_op(&mut self, o: &str) -> PR<()> {
         if self.is_op(o) {
@@ -125,12 +127,13 @@ impl Parser {
             return self.fail(format!("expected {{ to start a block but found {}", describe(self.peek())));
         }
         let open = self.line();
+        let open_pos = self.t[self.p].pos;
         self.advance();
         self.skip_seps();
         let mut v = Vec::new();
         while !self.is_op("}") {
             if matches!(self.peek(), Tok::Eof) {
-                return Err(ParseError { msg: "this block is never closed with }".into(), line: open });
+                return Err(ParseError { msg: "this block is never closed with }".into(), line: open, pos: Some(open_pos) });
             }
             v.push(self.statement()?);
             if !self.at_stmt_end() {
@@ -602,6 +605,7 @@ fn check_points(body: &[Stmt]) -> PR<()> {
                         return Err(ParseError {
                             msg: format!("POINT {} is already used on line {}", n, first),
                             line: s.line,
+                            pos: None,
                         });
                     }
                     seen.insert(n.clone(), s.line);

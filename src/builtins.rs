@@ -275,6 +275,9 @@ pub fn call(it: &mut Interp, name: &'static str, a: Vec<Value>) -> R<Value> {
         "PRINT" => {
             let s = a.iter().map(display).collect::<Vec<_>>().join(" ");
             let _ = writeln!(it.out, "{}", s);
+            if it.ide {
+                let _ = it.out.flush();
+            }
             Ok(Value::Null)
         }
         "NUM" => {

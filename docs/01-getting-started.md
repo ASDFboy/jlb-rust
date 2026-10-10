@@ -53,5 +53,6 @@ A few things to notice:
 | `jlb file.jlb` | runs a program |
 | `jlb --pause file.jlb` | runs a program, then waits for Enter |
 | `jlb --version` | shows the interpreter version |
+| `jlb --check file.jlb` | checks the syntax without running anything ([editor modes](09-programs-and-files.md#editor-modes)) |
 
 When a program crashes, `jlb` prints an error report and exits with code 1. A syntax error, or a file it can't find, also exits with a non-zero code.

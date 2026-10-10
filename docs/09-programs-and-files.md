@@ -70,3 +70,43 @@ age = INPUT("Age? ")
 PRINT(age + 1)          >> "251" if they typed 25
 PRINT(NUM(age) + 1)     >> 26
 ```
+
+## Editor modes
+
+These modes let code editors, like [JLB IDE](https://github.com/ASDFboy/jlb-ide), work with `jlb`. Each one answers in JSON, one line at a time, so any editor can read it. The C interpreter offers the same modes.
+
+| Command | What it does |
+| --- | --- |
+| `jlb --check file.jlb` | checks the syntax without running anything. Use `-` instead of a file name to send the code through input. |
+| `jlb --ide file.jlb` | runs a program for an editor: output is sent the moment it's printed, there's never a pause, and a crash also prints a JSON report |
+| `jlb --repl` | starts a Quick-try session that keeps its variables between snippets |
+
+Lines meant for the editor start with the ASCII "record separator" character (code 30), shown here as `␞`.
+
+**`--check`** prints `{"ok":true}`, or the first problem it finds, with its line and column (`col` is `null` when the problem is a whole line):
+
+```text
+{"ok":false,"message":"!= isn't an operator in .jlb; use !== (or !=== for the strict version)","line":2,"col":7}
+```
+
+**`--ide`** prints the normal crash report, then a `␞` line with the same report as JSON:
+
+```text
+␞{"message":"can't divide by zero","file":"crash.jlb","line":3,"traced":true,
+  "frames":[{"name":"f","line":3,"vars":[{"name":"n","value":"3","type":"NUMBER"}]}],
+  "outside":[{"name":"name","value":"\"Alex\"","type":"TEXT"}]}
+```
+
+(It's one line; it's split here to fit.) `frames` lists the running functions, innermost first. Each value is written the way `PRINT` shows it inside a table, so text keeps its quotes.
+
+**`--repl`** reads code until a line holding only `␞`, runs it, then prints `␞` and a JSON reply:
+
+| Snippet | Reply |
+| --- | --- |
+| a single expression, like `x * 2` | `{"ok":true,"value":"10","type":"NUMBER"}` |
+| statements, or a command that gives back nothing (like `PRINT`) | `{"ok":true}` |
+| `END` | `{"ok":true,"ended":true}` |
+| a crash or syntax error | `{"ok":false,"error":{...the --ide report...}}` |
+
+Anything the snippet prints comes before the reply. Sending `␞RESET` clears every variable.
+
