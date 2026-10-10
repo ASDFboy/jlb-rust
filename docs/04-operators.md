@@ -22,6 +22,8 @@ An assignment is always a statement by itself; it can't be used inside an expres
 | `-x` | negative | `-5` |
 
 - Dividing by zero (`/`, `%` or `!%`) is an error.
+- Math is exact, with no rounding errors ([how numbers work](03-values-and-types.md#numbers-are-exact)): `0.1 + 0.2` is `0.3`, and `0.3 % 0.1` is `0`.
+- Roots and fractional powers are exact whenever the answer comes out even: `0.25 !^ 2` is `0.5`, and `8 ^ (2 / 3)` is `4`. Otherwise they're approximate: `2 !^ 2` is `1.4142135623730951`.
 - `%` and `!%` work on decimals too: `7.5 % 2` is `1.5`, and `7.5 !% 2` is `3`. With negatives, `!%` cuts off the decimal like long division by hand: `-7 !% 2` is `-3`, and `-7 % 2` is `-1`.
 - An even root of a negative number is an error: `(-9) !^ 2`. An odd root works: `(-27) !^ 3` is `-3`. The parentheses matter, because `!^` happens before the minus sign: `-9 !^ 2` means `-(9 !^ 2)`, which is `-3`.
 - `NULL` counts as `0` in math.

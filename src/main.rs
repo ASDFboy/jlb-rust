@@ -5,6 +5,7 @@ mod ast;
 mod builtins;
 mod interp;
 mod lexer;
+mod number;
 mod ops;
 mod parser;
 mod value;

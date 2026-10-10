@@ -33,7 +33,26 @@ You can write numbers in these forms:
 
 `025` (a leading zero) is an error, and so is `.5` (write `0.5`). A negative number is just a minus sign in front: `-5`.
 
-Under the hood, numbers are 64-bit floating point. Whole numbers are exact up to about 9 quadrillion, and some decimals can't be stored exactly: `0.1 + 0.2` shows `0.30000000000000004`. Use `ROUND(x, 2)` to tidy results.
+### Numbers are exact
+
+Numbers don't pick up rounding errors, and they grow to as many digits as they need:
+
+```text
+0.1 + 0.2             >> 0.3 (and 0.1 + 0.2 == 0.3 is TRUE)
+19.99 * 3             >> 59.97
+1 / 3 * 3             >> 1
+2 ^ 100               >> 1267650600228229401496703205376
+1 / 2 ^ 10            >> 0.0009765625
+```
+
+How it works:
+
+- **Whole numbers can be as big as you need** (up to a million digits). Small ones use a fast 64-bit form, and bigger ones switch to as many digits as they need, automatically.
+- **Decimals are stored as exact fractions.** `0.1` is exactly one tenth, so adding, subtracting, multiplying and dividing never drifts.
+- **Decimals that go on forever,** like `1 / 3`, are kept as exact fractions too. `PRINT` shows them with 16 significant decimals (`0.3333333333333333`), but the real value is still exactly one third.
+- **Long calculations stay fast.** If a forever-decimal's fraction gets very long (its bottom number passes 50 digits), it's rounded to 50 significant decimals. That only happens in long chains of division, like repeating `x = (x + 2 / x) / 2` to find a square root, and the error is far too small to show.
+- **Some answers can't be written exactly,** because their digits never repeat: most roots (`2 !^ 2` is `1.4142135623730951`), powers like `2 ^ 0.5`, trig in radians, and `PI()`. Those are approximate, with about 16 significant digits, so `2 !^ 2 * 2 !^ 2` shows `2.0000000000000004`. Roots that come out even are exact (`16 !^ 2` is `4`, `0.25 !^ 2` is `0.5`), and `ROUND` turns an approximate number back into an exact one.
+- **The size limit is a million digits.** Going past it is an error: `that number needs too many digits to store`.
 
 ## Text
 

@@ -53,8 +53,8 @@ Built-ins are single ALL-CAPS words. An input shown in `[brackets]` is optional;
 | `ABS(x)` | removes the minus sign |
 | `MIN(a, b, ...)`, `MAX(a, b, ...)` | smallest or largest of any number of values |
 | `TABLE_MIN(t, [depth])`, `TABLE_MAX(t, [depth])` | smallest or largest value in a table, searching `depth` levels of sub-tables |
-| `ROUND(x, [decimals])`, `FLOOR(x, [decimals])`, `CEIL(x, [decimals])` | round to nearest, down or up; whole numbers unless `decimals` is given |
-| `PI([decimals])` | 3.14159...; `PI(2)` is 3.14 |
+| `ROUND(x, [decimals])`, `FLOOR(x, [decimals])`, `CEIL(x, [decimals])` | round to nearest, down or up; whole numbers unless `decimals` (0 to 1000) is given. The result is always exact, and halves round away from zero: `ROUND(2.5)` is 3, `ROUND(-2.5)` is -3 |
+| `PI([decimals])` | `PI()` is 3.141592653589793 (approximate); `PI(2)` is 3.14, and `PI(decimals)` gives up to 100 exact decimal places |
 | `RANDOM(min, max, [decimals], [seed])` | random number from min to max, including both (see below) |
 
 ### Trigonometry
@@ -68,7 +68,7 @@ Built-ins are single ALL-CAPS words. An input shown in `[brackets]` is optional;
 
 - **Trig uses degrees:** `SIN(90)` is 1, and `ATAN(1, 1)` is 45.
 - **Every trig command has a radians version** with `RAD_` in front: `RAD_SIN`, `RAD_COS`, `RAD_TAN`, `RAD_CSC`, `RAD_SEC`, `RAD_COT`, `RAD_ASIN`, `RAD_ACOS` and `RAD_ATAN`. For example, `RAD_SIN(PI() / 2)` is 1.
-- **Degree results are tidied,** so `COS(90)` is exactly 0, not a tiny leftover. Radian results keep full precision, so `RAD_ATAN(1, 1) == PI() / 4` is TRUE.
+- **Degree results are rounded to 12 decimal places,** so `COS(90)` is exactly 0 and `SIN(30)` is exactly 0.5, not tiny leftovers. Radian results are approximate with full precision (about 16 digits), so `RAD_ATAN(1, 1) == PI() / 4` is TRUE.
 - **Undefined points are errors:** `TAN(90)` is an error.
 
 ### RANDOM

@@ -10,6 +10,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use crate::ast::*;
 use crate::builtins;
 use crate::lexer;
+use crate::number::{Number, Rounding};
 use crate::ops::{self, truth};
 use crate::parser::Parser;
 use crate::value::*;
@@ -52,10 +53,10 @@ pub struct Interp {
 fn key_from(v: &Value) -> R<Key> {
     match v {
         Value::Num(n) => {
-            if n.fract() != 0.0 {
-                return err(format!("positions must be whole numbers, not {}", fmt_num(*n)));
+            if !n.is_integer() {
+                return err(format!("positions must be whole numbers, not {}", fmt_num(n)));
             }
-            Ok(Key::Pos(*n as i64))
+            Ok(Key::Pos(n.to_i64_saturating()))
         }
         Value::Text(s) => Ok(Key::Name(s.clone())),
         o => err(format!("a {} can't be used as a position or a name", o.type_name())),
@@ -98,15 +99,15 @@ fn fname(f: &Function) -> String {
 
 fn table_entries(t: &Table) -> Vec<(Value, Slot)> {
     let mut v: Vec<(Value, Slot)> =
-        t.items.iter().enumerate().map(|(i, s)| (Value::Num((i + 1) as f64), s.clone())).collect();
+        t.items.iter().enumerate().map(|(i, s)| (Value::int(i as i64 + 1), s.clone())).collect();
     v.extend(t.named.iter().map(|(k, s)| (Value::Text(k.clone()), s.clone())));
     v
 }
 
 fn whole_val(v: &Value, what: &str) -> R<i64> {
     match v {
-        Value::Num(n) if n.fract() == 0.0 => Ok(*n as i64),
-        Value::Num(n) => err(format!("{} must be a whole number, not {}", what, fmt_num(*n))),
+        Value::Num(n) if n.is_integer() => Ok(n.to_i64_saturating()),
+        Value::Num(n) => err(format!("{} must be a whole number, not {}", what, fmt_num(n))),
         o => err(format!("{} must be a number, not a {}", what, o.type_name())),
     }
 }
@@ -133,7 +134,7 @@ fn get_entry(bs: &Slot, key: &Key) -> R<Value> {
     let b = bs.borrow();
     let kv = match key {
         Key::Name(n) => Value::Text(n.clone()),
-        Key::Pos(p) => Value::Num(*p as f64),
+        Key::Pos(p) => Value::int(*p),
     };
     index_get(&b, &kv)
 }
@@ -433,7 +434,7 @@ impl Interp {
     fn error_table(&self, e: &ErrorInfo) -> Value {
         let mut t = Table::new();
         t.named.insert("message".into(), new_slot(Value::text(&e.msg)));
-        t.named.insert("line".into(), new_slot(Value::Num(e.line as f64)));
+        t.named.insert("line".into(), new_slot(Value::int(e.line as i64)));
         t.named.insert("file".into(), new_slot(Value::text(&e.file)));
         let mut vars = Table::new();
         if let Some(f) = e.frames.first() {
@@ -615,9 +616,9 @@ impl Interp {
             StmtKind::Repeat(n, b) => {
                 let v = self.eval(n)?;
                 let count = match v {
-                    Value::Num(x) if x < 0.0 => return err("REPEAT can't run a negative number of times"),
-                    Value::Num(x) if x.fract() != 0.0 => return err("REPEAT needs a whole number of times"),
-                    Value::Num(x) => x as u64,
+                    Value::Num(x) if x.is_neg() => return err("REPEAT can't run a negative number of times"),
+                    Value::Num(x) if !x.is_integer() => return err("REPEAT needs a whole number of times"),
+                    Value::Num(x) => x.to_i64_saturating() as u64,
                     o => return err(format!("REPEAT needs a number, not a {}", o.type_name())),
                 };
                 for _ in 0..count {
@@ -669,7 +670,7 @@ impl Interp {
         }
     }
 
-    fn loop_num(&mut self, e: &Expr, what: &str) -> R<f64> {
+    fn loop_num(&mut self, e: &Expr, what: &str) -> R<Number> {
         match self.eval(e)? {
             Value::Num(n) => Ok(n),
             o => err(format!("the {} of a counting loop must be a number, not a {}", what, o.type_name())),
@@ -681,18 +682,40 @@ impl Interp {
         let end = self.loop_num(b, "end")?;
         let st = match step {
             Some(e) => self.loop_num(e, "STEP")?,
-            None => 1.0,
+            None => Number::int(1),
         };
-        if st == 0.0 {
+        if st.is_zero() {
             return err("STEP 0 would loop forever");
         }
-        let st = if start <= end { st.abs() } else { -st.abs() };
-        let count = (((end - start) / st) + 1e-9).floor() as i64 + 1;
+        let up = start.compare(&end).is_le();
+        let st = if up { st.abs() } else { st.abs().neg() };
+        // Exact numbers count exactly. Approximate ones get a little tidying.
+        let approx = start.is_float() || end.is_float() || st.is_float();
+        let count = if approx {
+            let (s0, e0, t0) = (start.to_f64(), end.to_f64(), st.to_f64());
+            (((e0 - s0) / t0) + 1e-9).floor() as i64 + 1
+        } else {
+            end.sub(&start)?.div(&st)?.round(0, Rounding::Floor)?.to_i64_saturating().saturating_add(1)
+        };
         self.frame_mut().scopes.push(OrdMap::new());
         let mut result = Ok(Flow::Normal);
+        let mut v = start.clone();
         for k in 0..count.max(0) {
-            let v = round_to(start + k as f64 * st, 12);
-            self.frame_mut().scopes.last_mut().unwrap().insert(var.clone(), new_slot(Value::Num(v)));
+            if k > 0 {
+                let next = if approx {
+                    Number::from_f64_rounded(start.to_f64() + k as f64 * st.to_f64(), 12)
+                } else {
+                    v.add(&st)
+                };
+                match next {
+                    Ok(n) => v = n,
+                    Err(e) => {
+                        result = Err(e);
+                        break;
+                    }
+                }
+            }
+            self.frame_mut().scopes.last_mut().unwrap().insert(var.clone(), new_slot(Value::Num(v.clone())));
             match self.loop_body(body) {
                 Ok(None) => {}
                 Ok(Some(f)) => {
@@ -722,7 +745,7 @@ impl Interp {
             Value::Text(s) => Ok(s
                 .chars()
                 .enumerate()
-                .map(|(i, c)| (Value::Num((i + 1) as f64), new_slot(Value::text(&c.to_string()))))
+                .map(|(i, c)| (Value::int(i as i64 + 1), new_slot(Value::text(&c.to_string()))))
                 .collect()),
             o => err(format!("FOR ... IN needs a table or text, not a {}", o.type_name())),
         }
@@ -961,7 +984,7 @@ impl Interp {
 
     pub fn eval(&mut self, e: &Expr) -> R<Value> {
         match e {
-            Expr::Num(n) => Ok(Value::Num(*n)),
+            Expr::Num(n) => Ok(Value::Num(n.clone())),
             Expr::Text(s) => Ok(Value::Text(s.clone())),
             Expr::Bool(b) => Ok(Value::Bool(*b)),
             Expr::Null => Ok(Value::Null),

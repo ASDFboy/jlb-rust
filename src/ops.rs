@@ -2,25 +2,19 @@
 
 use std::rc::Rc;
 
+use crate::number::Number;
 use crate::value::*;
 
 const MAX_LEN: usize = 100_000_000;
-
-pub fn num(x: f64) -> R<Value> {
-    if !x.is_finite() {
-        return err("that result is too big to store");
-    }
-    Ok(Value::Num(if x == 0.0 { 0.0 } else { x }))
-}
 
 /// The truth rules shared by IF, WHILE and every logic operator.
 pub fn truth(v: &Value) -> R<bool> {
     match v {
         Value::Bool(b) => Ok(*b),
         Value::Null => Ok(false),
-        Value::Num(n) if *n == 1.0 => Ok(true),
-        Value::Num(n) if *n == 0.0 => Ok(false),
-        Value::Num(n) => err(format!("{} can't be used as TRUE or FALSE (only 1 and 0 can)", fmt_num(*n))),
+        Value::Num(n) if n.is_int(1) => Ok(true),
+        Value::Num(n) if n.is_zero() => Ok(false),
+        Value::Num(n) => err(format!("{} can't be used as TRUE or FALSE (only 1 and 0 can)", fmt_num(n))),
         Value::Text(s) => match &**s {
             "1" | "TRUE" => Ok(true),
             "0" | "FALSE" => Ok(false),
@@ -30,18 +24,18 @@ pub fn truth(v: &Value) -> R<bool> {
     }
 }
 
-fn whole(x: f64, what: &str) -> R<i64> {
-    if x.fract() != 0.0 {
+fn whole(x: &Number, what: &str) -> R<i64> {
+    if !x.is_integer() {
         return err(format!("{} must be a whole number, not {}", what, fmt_num(x)));
     }
-    Ok(x as i64)
+    Ok(x.to_i64_saturating())
 }
 
 /// Value as a number for math. NULL counts as 0.
-pub fn math_num(v: &Value, op: &str) -> R<f64> {
+pub fn math_num(v: &Value, op: &str) -> R<Number> {
     match v {
-        Value::Num(n) => Ok(*n),
-        Value::Null => Ok(0.0),
+        Value::Num(n) => Ok(n.clone()),
+        Value::Null => Ok(Number::int(0)),
         Value::Text(s) => err(format!(
             "can't use {} on text ({}); convert it with NUM() first",
             op,
@@ -60,7 +54,7 @@ fn join_str(v: &Value) -> String {
 }
 
 fn repeat<T: Clone>(items: &[T], n: i64) -> R<Vec<T>> {
-    let count = n.unsigned_abs() as usize;
+    let count = usize::try_from(n.unsigned_abs()).unwrap_or(usize::MAX);
     if items.len().saturating_mul(count) > MAX_LEN {
         return err("that would be too big to store");
     }
@@ -102,17 +96,17 @@ pub fn binop(op: &str, a: Value, b: Value) -> R<Value> {
                 Ok(rebuild(t, v))
             }
             (Text(_), _) | (_, Text(_)) => Ok(Value::text(&(join_str(&a) + &join_str(&b)))),
-            _ => num(math_num(&a, "+")? + math_num(&b, "+")?),
+            _ => Ok(Num(math_num(&a, "+")?.add(&math_num(&b, "+")?)?)),
         },
         "-" => match (&a, &b) {
             (Table(t, _), Num(n)) => {
-                let n = whole(*n, "the number of items to remove")?;
+                let k = whole(n, "the number of items to remove")?;
                 let mut v = items_of(t);
-                if n >= 0 {
-                    let keep = v.len().saturating_sub(n as usize);
+                if k >= 0 {
+                    let keep = v.len().saturating_sub(usize::try_from(k).unwrap_or(usize::MAX));
                     v.truncate(keep);
                 } else {
-                    v.push(Num(-(n as f64)));
+                    v.push(Num(n.neg()));
                 }
                 Ok(rebuild(t, v))
             }
@@ -121,13 +115,13 @@ pub fn binop(op: &str, a: Value, b: Value) -> R<Value> {
                 Ok(rebuild(t, v))
             }
             (Text(s), Num(n)) => {
-                let n = whole(*n, "the number of characters to trim")?;
-                if n >= 0 {
+                let k = whole(n, "the number of characters to trim")?;
+                if k >= 0 {
                     let cs: Vec<char> = s.chars().collect();
-                    let keep = cs.len().saturating_sub(n as usize);
+                    let keep = cs.len().saturating_sub(usize::try_from(k).unwrap_or(usize::MAX));
                     Ok(Value::text(&cs[..keep].iter().collect::<String>()))
                 } else {
-                    Ok(Value::text(&format!("{}{}", s, fmt_num(-(n as f64)))))
+                    Ok(Value::text(&format!("{}{}", s, fmt_num(&n.neg()))))
                 }
             }
             (Text(s), Text(t)) => {
@@ -140,80 +134,47 @@ pub fn binop(op: &str, a: Value, b: Value) -> R<Value> {
             (Text(_), Null) => Ok(a.clone()),
             (Text(_), _) => err(format!("can't subtract a {} from text", b.type_name())),
             (Num(_) | Null, Text(_)) => err("a number minus text has no meaning"),
-            _ => num(math_num(&a, "-")? - math_num(&b, "-")?),
+            _ => Ok(Num(math_num(&a, "-")?.sub(&math_num(&b, "-")?)?)),
         },
         "*" => match (&a, &b) {
             (Table(t, _), Num(n)) | (Num(n), Table(t, _)) => {
-                let n = whole(*n, "the number of repeats")?;
+                let n = whole(n, "the number of repeats")?;
                 Ok(rebuild(t, repeat(&items_of(t), n)?))
             }
             (Table(..), _) | (_, Table(..)) => err("a table can only be multiplied by a number"),
             (Text(s), Num(n)) | (Num(n), Text(s)) => {
-                if n.fract() != 0.0 {
+                if !n.is_integer() {
                     return err("can't repeat text a fraction of times");
                 }
                 let cs: Vec<char> = s.chars().collect();
-                Ok(Value::text(&repeat(&cs, *n as i64)?.into_iter().collect::<String>()))
+                Ok(Value::text(&repeat(&cs, n.to_i64_saturating())?.into_iter().collect::<String>()))
             }
             (Text(_), Null) | (Null, Text(_)) => Ok(Value::text("")),
             (Text(_), _) | (_, Text(_)) => err("text can only be repeated a number of times (the repeat count must be a number)"),
-            _ => num(math_num(&a, "*")? * math_num(&b, "*")?),
+            _ => Ok(Num(math_num(&a, "*")?.mul(&math_num(&b, "*")?)?)),
         },
-        "/" => {
-            let (x, y) = (math_num(&a, "/")?, math_num(&b, "/")?);
-            if y == 0.0 {
-                return err("can't divide by zero");
-            }
-            num(x / y)
-        }
-        "%" | "!%" => {
+        "/" | "%" | "!%" | "^" | "!^" => {
             let (x, y) = (math_num(&a, op)?, math_num(&b, op)?);
-            if y == 0.0 {
-                return err("can't divide by zero");
-            }
-            if op == "%" {
-                num(x % y)
-            } else {
-                num((x / y).trunc())
-            }
-        }
-        "^" => {
-            let (x, y) = (math_num(&a, "^")?, math_num(&b, "^")?);
-            let r = x.powf(y);
-            if r.is_nan() {
-                return err("that power has no real answer");
-            }
-            num(r)
-        }
-        "!^" => {
-            let (x, n) = (math_num(&a, "!^")?, math_num(&b, "!^")?);
-            if n == 0.0 {
-                return err("can't take a 0th root");
-            }
-            let r = if x < 0.0 {
-                if n.fract() == 0.0 && (n as i64) % 2 != 0 {
-                    -(-x).powf(1.0 / n)
-                } else {
-                    return err("an even root of a negative number has no real answer");
-                }
-            } else {
-                x.powf(1.0 / n)
-            };
-            let rr = r.round();
-            num(if (r - rr).abs() < 1e-9 * rr.abs().max(1.0) { rr } else { r })
+            Ok(Num(match op {
+                "/" => x.div(&y)?,
+                "%" => x.rem(&y)?,
+                "!%" => x.quot(&y)?,
+                "^" => x.pow(&y)?,
+                _ => x.root(&y)?,
+            }))
         }
         _ => err(format!("unknown operator {}", op)),
     }
 }
 
 pub fn negate(v: Value) -> R<Value> {
-    num(-math_num(&v, "-")?)
+    Ok(Value::Num(math_num(&v, "-")?.neg()))
 }
 
-fn cmp_num(v: &Value) -> R<f64> {
+fn cmp_num(v: &Value) -> R<Number> {
     match v {
-        Value::Num(n) => Ok(*n),
-        Value::Null => Ok(0.0),
+        Value::Num(n) => Ok(n.clone()),
+        Value::Null => Ok(Number::int(0)),
         Value::Text(s) => parse_num_text(s)
             .map_or_else(|| err(format!("can't compare the text {} with a number", quote_text(s))), Ok),
         other => err(format!("can't compare a {} with < or >", other.type_name())),
@@ -232,12 +193,12 @@ pub fn compare(op: &str, a: &Value, b: &Value) -> R<bool> {
             _ => x > y || s == t,
         });
     }
-    let (x, y) = (cmp_num(a)?, cmp_num(b)?);
+    let o = cmp_num(a)?.compare(&cmp_num(b)?);
     Ok(match op {
-        "<" => x < y,
-        ">" => x > y,
-        "<=" | "<==" => x <= y,
-        _ => x >= y,
+        "<" => o.is_lt(),
+        ">" => o.is_gt(),
+        "<=" | "<==" => o.is_le(),
+        _ => o.is_ge(),
     })
 }
 
@@ -277,14 +238,14 @@ fn loose_eq_d(a: &Value, b: &Value, d: usize) -> bool {
         (Text(s), Text(t)) => s == t,
         (Text(s), Num(n)) | (Num(n), Text(s)) => parse_num_text(s).is_some_and(|v| v == *n),
         (Bool(x), Bool(y)) => x == y,
-        (Bool(x), Num(n)) | (Num(n), Bool(x)) => (if *x { 1.0 } else { 0.0 }) == *n,
+        (Bool(x), Num(n)) | (Num(n), Bool(x)) => n.is_int(if *x { 1 } else { 0 }),
         (Bool(x), Text(s)) | (Text(s), Bool(x)) => match &**s {
             "TRUE" | "1" => *x,
             "FALSE" | "0" => !*x,
             _ => false,
         },
         (Null, Null) => true,
-        (Null, Num(n)) | (Num(n), Null) => *n == 0.0,
+        (Null, Num(n)) | (Num(n), Null) => n.is_zero(),
         (Null, Bool(x)) | (Bool(x), Null) => !*x,
         (Table(x, _), Table(y, _)) => Rc::ptr_eq(x, y) || tables_eq(x, y, d),
         (Func(f), Func(g)) => Rc::ptr_eq(f, g),

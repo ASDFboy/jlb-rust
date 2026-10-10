@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::ast::FuncDecl;
+use crate::number::Number;
 
 /// A variable or table entry. `@` sharing makes two names point at the same slot.
 pub type Slot = Rc<RefCell<Value>>;
@@ -43,7 +44,7 @@ pub struct Function {
 
 #[derive(Clone)]
 pub enum Value {
-    Num(f64),
+    Num(Number),
     Text(Rc<str>),
     Bool(bool),
     Null,
@@ -68,6 +69,9 @@ impl Value {
     }
     pub fn text(s: &str) -> Value {
         Value::Text(Rc::from(s))
+    }
+    pub fn int(i: i64) -> Value {
+        Value::Num(Number::int(i))
     }
     pub fn is_func(&self) -> bool {
         matches!(self, Value::Func(_) | Value::Builtin(_))
@@ -229,20 +233,8 @@ pub fn report(e: &ErrorInfo) -> String {
 
 // ---------- formatting ----------
 
-pub fn fmt_num(x: f64) -> String {
-    if x == 0.0 {
-        return "0".into();
-    }
-    if x.is_nan() {
-        return "NaN".into();
-    }
-    if x.fract() == 0.0 && x.abs() < 1e16 {
-        return format!("{}", x as i64);
-    }
-    if !(1e-6..1e16).contains(&x.abs()) {
-        return format!("{:e}", x);
-    }
-    format!("{}", x)
+pub fn fmt_num(x: &Number) -> String {
+    x.to_string()
 }
 
 pub fn display(v: &Value) -> String {
@@ -286,7 +278,7 @@ pub fn is_ident(s: &str) -> bool {
 
 fn write_val(out: &mut String, v: &Value, quote: bool, depth: usize) {
     match v {
-        Value::Num(n) => out.push_str(&fmt_num(*n)),
+        Value::Num(n) => out.push_str(&fmt_num(n)),
         Value::Text(s) => {
             if quote {
                 out.push_str(&quote_text(s))
@@ -342,7 +334,7 @@ fn write_val(out: &mut String, v: &Value, quote: bool, depth: usize) {
 
 /// Text that counts as a number: 25, -25, 2.5, 1e3, 1.5e-3, 0xFF.
 /// Not numbers: "025", " 25 ", "1,000", ".5", "".
-pub fn parse_num_text(s: &str) -> Option<f64> {
+pub fn parse_num_text(s: &str) -> Option<Number> {
     let (neg, body) = match s.strip_prefix('-') {
         Some(r) => (true, r),
         None => (false, s),
@@ -354,7 +346,7 @@ pub fn parse_num_text(s: &str) -> Option<f64> {
         if h.is_empty() || !h.chars().all(|c| c.is_ascii_hexdigit()) {
             return None;
         }
-        i64::from_str_radix(h, 16).ok()? as f64
+        Number::parse_literal(body).ok()?
     } else {
         let b = body.as_bytes();
         let mut i;
@@ -394,24 +386,7 @@ pub fn parse_num_text(s: &str) -> Option<f64> {
         if i != b.len() {
             return None;
         }
-        body.parse::<f64>().ok()?
+        Number::parse_literal(body).ok()?
     };
-    Some(if neg { -v } else { v })
-}
-
-/// How many digits a number shows after the decimal point.
-pub fn decimal_places(x: f64) -> i32 {
-    let s = fmt_num(x);
-    if let Some(epos) = s.find('e') {
-        let (m, e) = s.split_at(epos);
-        let exp: i32 = e[1..].parse().unwrap_or(0);
-        let md = m.find('.').map(|p| (m.len() - p - 1) as i32).unwrap_or(0);
-        return (md - exp).max(0);
-    }
-    s.find('.').map(|p| (s.len() - p - 1) as i32).unwrap_or(0)
-}
-
-pub fn round_to(x: f64, d: i32) -> f64 {
-    let s = 10f64.powi(d);
-    (x * s).round() / s
+    Some(if neg { v.neg() } else { v })
 }

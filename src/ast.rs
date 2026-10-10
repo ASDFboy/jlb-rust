@@ -2,8 +2,10 @@
 
 use std::rc::Rc;
 
+use crate::number::Number;
+
 pub enum Expr {
-    Num(f64),
+    Num(Number),
     Text(Rc<str>),
     Bool(bool),
     Null,

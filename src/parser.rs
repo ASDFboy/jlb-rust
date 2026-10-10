@@ -428,7 +428,7 @@ impl Parser {
             self.advance();
             let e = self.unary()?;
             if let Expr::Num(n) = e {
-                return Ok(Expr::Num(-n));
+                return Ok(Expr::Num(n.neg()));
             }
             return Ok(Expr::Unary("-", Box::new(e)));
         }

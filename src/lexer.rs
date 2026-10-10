@@ -2,9 +2,11 @@
 
 use std::rc::Rc;
 
+use crate::number::Number;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Tok {
-    Num(f64),
+    Num(Number),
     Str(Rc<str>),
     Name(Rc<str>),
     Kw(&'static str),
@@ -185,10 +187,10 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
                 if i == hs {
                     return fail("0x must be followed by hex digits".into(), line);
                 }
-                let h: String = c[hs..i].iter().collect();
-                match i64::from_str_radix(&h, 16) {
-                    Ok(v) => v as f64,
-                    Err(_) => return fail("that hex number is too big".into(), line),
+                let h: String = c[st..i].iter().collect();
+                match Number::parse_literal(&h) {
+                    Ok(v) => v,
+                    Err(_) => return fail("that number is too big".into(), line),
                 }
             } else {
                 if ch == '0' && at(i + 1).is_ascii_digit() {
@@ -213,7 +215,10 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
                     }
                 }
                 let t: String = c[st..i].iter().collect();
-                t.parse().unwrap_or(0.0)
+                match Number::parse_literal(&t) {
+                    Ok(v) => v,
+                    Err(_) => return fail("that number is too big".into(), line),
+                }
             };
             if at(i).is_ascii_alphanumeric() || at(i) == '_' {
                 return fail("names can't start with a digit".into(), line);
