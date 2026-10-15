@@ -327,7 +327,13 @@ pub fn call(it: &mut Interp, name: &'static str, a: Vec<Value>) -> R<Value> {
             }
             let _ = it.out.flush();
             let mut line = String::new();
-            let _ = std::io::stdin().lock().read_line(&mut line);
+            match &it.debug_input {
+                // While debugging, standard input also carries the debugger's commands.
+                Some(rx) => line = rx.recv().unwrap_or_default(),
+                None => {
+                    let _ = std::io::stdin().lock().read_line(&mut line);
+                }
+            }
             while line.ends_with('\n') || line.ends_with('\r') {
                 line.pop();
             }

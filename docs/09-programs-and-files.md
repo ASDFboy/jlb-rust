@@ -73,13 +73,14 @@ PRINT(NUM(age) + 1)     >> 26
 
 ## Editor modes
 
-These modes let code editors, like [JLB IDE](https://github.com/ASDFboy/jlb-ide), work with `jlb`. Each one answers in JSON, one line at a time, so any editor can read it. The C interpreter offers the same modes.
+These modes let code editors, like [JLB IDE](https://github.com/ASDFboy/jlb-ide), work with `jlb`. Each one answers in JSON, one line at a time, so any editor can read it. The C interpreter offers the same modes, apart from `--debug`.
 
 | Command | What it does |
 | --- | --- |
 | `jlb --check file.jlb` | checks the syntax without running anything. Use `-` instead of a file name to send the code through input. |
 | `jlb --ide file.jlb` | runs a program for an editor: output is sent the moment it's printed, there's never a pause, and a crash also prints a JSON report |
 | `jlb --repl` | starts a Quick-try session that keeps its variables between snippets |
+| `jlb --debug file.jlb` | runs a program for an editor's debugger, which can stop it at breakpoints, step through it line by line and look at every variable |
 
 Lines meant for the editor start with the ASCII "record separator" character (code 30), shown here as `␞`.
 
@@ -116,3 +117,32 @@ Anything the snippet prints comes before the reply. Sending `␞RESET` clears ev
 
 `INPUT` works too: instead of printing its prompt, it prints `␞{"input":"the prompt"}` and reads the answer as the next line of input. The snippet then carries on.
 
+
+**`--debug`** runs like `--ide`, and the editor can also stop the program and look inside it. It starts by printing `␞{"event":"ready"}`, then waits for the editor to set breakpoints and say `continue` (or `step`, to stop at the first line).
+
+The editor sends commands as input lines starting with `␞`; any other line is an answer for `INPUT`:
+
+| Command | What it does |
+| --- | --- |
+| `␞break <path><TAB><line>,<line>,...` | sets the breakpoints for one file, replacing its old ones (no lines removes them). Works while the program runs, too. |
+| `␞continue` | runs until the next breakpoint |
+| `␞step` | stops at the very next statement, going into functions |
+| `␞over` | stops at the next statement in this function (or in the code that called it) |
+| `␞out` | stops once the current function has finished |
+| `␞pause` | stops as soon as possible (useful when a loop never ends) |
+| `␞eval <id><TAB><expression>` | works out an expression with the stopped function's variables |
+| `␞stop` | ends the program |
+
+When the program stops, `jlb` prints (on standard error, like the crash report) a `␞` line:
+
+```text
+␞{"event":"paused","reason":"breakpoint","path":"C:\\code\\game.jlb","line":4,"message":null,
+  "stack":[{"name":"heal","path":"C:\\code\\game.jlb","line":4,"vars":[{"name":"amount","type":"NUMBER","value":"1"}]},
+           {"name":"","path":"C:\\code\\game.jlb","line":9,"vars":[{"name":"i","type":"NUMBER","value":"1"}]}],
+  "globals":[{"name":"hero","type":"TABLE","value":"[name: \"Ann\", hp: 10]","items":[
+     {"name":"name","type":"TEXT","value":"\"Ann\""},{"name":"hp","type":"NUMBER","value":"10"}],"more":0}]}
+```
+
+`reason` is `breakpoint`, `step`, `pause`, or `error`: an error that no `TRY` will catch stops the program first, with `message` saying what went wrong, so everything can still be looked at. After the editor's next command the program carries on (and for an error, ends with the usual crash report). `stack` lists the running functions, innermost first, then the file's top level (with an empty `name`), each with its own variables; `globals` are the variables outside functions. A table's `items` list its entries (up to 200 each, and a few thousand values in all); `more` counts the ones left out. When the program carries on, `jlb` prints `␞{"event":"resumed"}`.
+
+`eval` replies with `␞{"event":"eval","id":"<id>","ok":true,"value":{...}}`, or `"ok":false` and a `message`. Only expressions can be worked out, and they can't stop at breakpoints, but they can change variables (`x += 1` isn't allowed, but a function that changes a shared table is), so keep them simple.

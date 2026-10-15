@@ -44,7 +44,7 @@ It also has a lot of its own ideas. Text and tables can be multiplied, subtracte
 
 There's also a C interpreter, [jlb-c](https://github.com/ASDFboy/jlb-c). Both must pass the same test programs in [`tests/cases`](tests/cases).
 
-To write .jlb, there's [**JLB IDE**](https://github.com/ASDFboy/jlb-ide): an editor with live mistake checking, a crash report viewer, hover explanations of .jlb's operators, and a Quick-try console. It comes with this interpreter.
+To write .jlb, there's [**JLB IDE**](https://github.com/ASDFboy/jlb-ide): an editor with live mistake checking, a step-by-step debugger, a crash report viewer, hover explanations of .jlb's operators, and a Quick-try console. It comes with this interpreter.
 
 ## Pros and cons
 

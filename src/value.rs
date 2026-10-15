@@ -34,6 +34,8 @@ pub fn new_id() -> u64 {
 pub struct Source {
     pub name: String,
     pub dir: PathBuf,
+    /// The file's full path with links resolved (empty for Quick-try), for breakpoints.
+    pub canon: PathBuf,
 }
 
 pub struct Function {

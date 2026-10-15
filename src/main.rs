@@ -1,8 +1,9 @@
 // jlb: interpreter for the .jlb language.
-// Usage: jlb [--pause | --ide] <file.jlb>, jlb --check <file.jlb | ->, jlb --repl
+// Usage: jlb [--pause | --ide] <file.jlb>, jlb --check <file.jlb | ->, jlb --repl, jlb --debug <file.jlb>
 
 mod ast;
 mod builtins;
+mod debug;
 mod ide;
 mod interp;
 mod lexer;
@@ -57,6 +58,17 @@ fn main() {
             let target = args.get(1).cloned().unwrap_or_else(|| "-".into());
             std::process::exit(ide::run_check(&target));
         }
+        Some("--debug") => {
+            let Some(file) = args.get(1).cloned() else {
+                eprintln!("Usage: jlb --debug <file.jlb>");
+                std::process::exit(2);
+            };
+            let child = std::thread::Builder::new()
+                .stack_size(256 * 1024 * 1024)
+                .spawn(move || debug::run(&file))
+                .expect("couldn't start the interpreter thread");
+            std::process::exit(child.join().unwrap_or(101));
+        }
         Some("--repl") => {
             let child = std::thread::Builder::new()
                 .stack_size(256 * 1024 * 1024)
@@ -76,6 +88,7 @@ fn main() {
         eprintln!("       jlb --check <file.jlb>   check the syntax only (- reads the code from input)");
         eprintln!("       jlb --ide <file.jlb>     run for an editor (live output, JSON crash report)");
         eprintln!("       jlb --repl               start a Quick-try session for an editor");
+        eprintln!("       jlb --debug <file.jlb>   run for an editor's debugger (see src/debug.rs)");
         return;
     }
     if first == "--version" {

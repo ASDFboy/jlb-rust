@@ -50,6 +50,12 @@ pub struct Interp {
     pub ide: bool,
     /// Running a Quick-try session (jlb --repl): INPUT asks the editor for its answer.
     pub repl: bool,
+    /// Running under an editor's debugger (jlb --debug).
+    pub debug: Option<Box<crate::debug::Debugger>>,
+    /// While debugging, INPUT's answers arrive here (standard input also carries commands).
+    pub debug_input: Option<std::sync::mpsc::Receiver<String>>,
+    /// How many TRY blocks are running, so the debugger knows whether an error will be caught.
+    pub try_depth: usize,
     imported: HashSet<PathBuf>,
     loaded: HashMap<PathBuf, Value>,
 }
@@ -89,7 +95,7 @@ fn shareable(v: &Value) -> bool {
     matches!(v, Value::Table(..) | Value::Text(_))
 }
 
-fn vars_of(m: &OrdMap) -> Vec<(Rc<str>, Value)> {
+pub fn vars_of(m: &OrdMap) -> Vec<(Rc<str>, Value)> {
     m.iter().filter(|(_, s)| !s.borrow().is_func()).map(|(k, s)| (k.clone(), s.borrow().clone())).collect()
 }
 
@@ -305,6 +311,9 @@ impl Interp {
             rng: seed ^ 0x9E37_79B9_7F4A_7C15,
             ide: false,
             repl: false,
+            debug: None,
+            debug_input: None,
+            try_depth: 0,
             imported: HashSet::new(),
             loaded: HashMap::new(),
         }
@@ -342,7 +351,7 @@ impl Interp {
 
     pub fn start_session(&mut self, dir: PathBuf) {
         let env: Env = Rc::new(RefCell::new(OrdMap::new()));
-        let src = Rc::new(Source { name: "quick-try".into(), dir });
+        let src = Rc::new(Source { name: "quick-try".into(), dir, canon: PathBuf::new() });
         self.frames.push(Frame { func: None, scopes: Vec::new(), env, line: 0, src });
     }
 
@@ -405,7 +414,8 @@ impl Interp {
         };
         let toks = lexer::lex(&text).map_err(|e| syntax(e.msg, e.line))?;
         let prog = Parser::new(toks).program().map_err(|e| syntax(e.msg, e.line))?;
-        Ok((prog, Rc::new(Source { name: name.clone(), dir })))
+        let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        Ok((prog, Rc::new(Source { name: name.clone(), dir, canon })))
     }
 
     fn run_module(&mut self, path: &Path, env: Env) -> R<()> {
@@ -621,9 +631,22 @@ impl Interp {
 
     fn exec_stmt(&mut self, s: &Stmt) -> R<Flow> {
         self.frame_mut().line = s.line;
+        if self.debug.is_some() {
+            self.debug_check(s.line)?;
+        }
         match self.exec_kind(s) {
             Err(mut f) => {
+                let fresh = matches!(&f, Fault::Error(e) if !e.captured);
                 self.capture(&mut f, s.line);
+                // While debugging, an error nothing will catch stops here first, so
+                // everything can be looked at before the program ends.
+                if fresh && self.try_depth == 0 && self.debug.is_some() {
+                    if let Fault::Error(e) = &f {
+                        let msg = e.msg.clone();
+                        self.frame_mut().line = s.line;
+                        self.debug_pause("error", Some(&msg))?;
+                    }
+                }
                 Err(f)
             }
             ok => ok,
@@ -713,7 +736,12 @@ impl Interp {
                 self.set_var(d.name.as_ref().unwrap(), f);
                 Ok(Flow::Normal)
             }
-            StmtKind::Try(body, name, fail) => match self.exec_block(body) {
+            StmtKind::Try(body, name, fail) => match {
+                self.try_depth += 1;
+                let r = self.exec_block(body);
+                self.try_depth -= 1;
+                r
+            } {
                 Err(Fault::Error(e)) => {
                     let t = self.error_table(&e);
                     let mut sc = OrdMap::new();
