@@ -42,11 +42,13 @@ It also has a lot of its own ideas. Text and tables can be multiplied, subtracte
 
 There's also a C interpreter, [jlb-c](https://github.com/ASDFboy/jlb-c). Both must pass the same test programs in [`tests/cases`](tests/cases).
 
+To write .jlb, there's [**JLB IDE**](https://github.com/ASDFboy/jlb-ide): an editor with live mistake checking, a crash report viewer, hover explanations of .jlb's operators, and a Quick-try console. It comes with this interpreter.
+
 ## Pros and cons
 
 | Pros | Cons |
 | --- | --- |
-| **Easy to read.** ALL CAPS commands and lowercase names never get mixed up, and naming mistakes come with a suggested fix. | **Brand new.** There are no libraries, package manager, editor syntax highlighting, or community yet. |
+| **Easy to read.** ALL CAPS commands and lowercase names never get mixed up, and naming mistakes come with a suggested fix. | **Brand new.** There are no libraries, package manager or community yet, and [JLB IDE](https://github.com/ASDFboy/jlb-ide) is the only editor that understands .jlb. |
 | **Flexible like JavaScript.** Variables can switch types, and `==` converts while `===` doesn't. | **No graphics, sound, networking or live keyboard input yet.** Programs talk through `PRINT` and `INPUT`. |
 | **One simple collection type.** Tables work as lists, as records with named entries, or both at once. | **Slower than compiled languages.** It runs your code directly instead of compiling it, so heavy number crunching is much slower than in C or Rust. |
 | **Powerful text and table tricks.** You get repeat, reverse, trim, slices (`t[2 TO 4]`) and negative positions (`t[-1]`). | **Some rules are reversed from other languages.** `&` stops early but `&&` checks both sides, `!==` is the loose not-equal, and single quotes are the ones with backslash codes. |
