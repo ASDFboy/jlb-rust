@@ -52,6 +52,7 @@ FOR i, c IN "ab" { PRINT(i, c) }    >> 1 a / 2 b
 
 - **With one variable,** you get each value. **With two,** you get the position or name, then the value.
 - **Numbered items come first,** in order, then named entries in the order they were added.
+- **The loop variables exist only inside the loop.** After the closing `}`, using them is an error.
 - **The loop variable is a copy.** To change the real items, share it with `@`:
 
   ```text

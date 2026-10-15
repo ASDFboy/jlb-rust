@@ -52,8 +52,9 @@ A function's locals are:
 
 - anything declared with `LOCAL`;
 - any new name first created inside it;
-- its inputs;
-- its `FOR` loop variables.
+- its inputs.
+
+A `FOR` loop's variables (and a `FAIL` block's error name) are different: they exist only inside that loop's `{ }` block, in or out of a function.
 
 ### Reaching another function's locals
 
