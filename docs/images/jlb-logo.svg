@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" role="img" aria-label="JLB">
+  <title>JLB</title>
+  <rect width="300" height="300" rx="66" fill="#e6db74"/>
+  <path d="M32 150A118 118 0 0 1 233.4 66.6" fill="none" stroke="#272822" stroke-opacity="0.35" stroke-width="5" stroke-dasharray="1 12" stroke-linecap="round"/>
+  <circle cx="233.4" cy="66.6" r="21" fill="#f92672"/>
+  <g transform="translate(96 194) scale(0.78)" fill="none" stroke="#272822" stroke-width="18" stroke-linejoin="miter">
+    <path d="M14 9H64M50 0V68A23 23 0 0 1 4 68V62"/>
+    <path d="M90 0V91H140"/>
+    <path d="M162 0V100M162 9H190A18 18 0 0 1 190 45H162M162 45H194A23 23 0 0 1 194 91H162"/>
+  </g>
+</svg>

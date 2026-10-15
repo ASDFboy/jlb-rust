@@ -92,12 +92,12 @@ Lines meant for the editor start with the ASCII "record separator" character (co
 **`--ide`** prints the normal crash report, then a `␞` line with the same report as JSON:
 
 ```text
-␞{"message":"can't divide by zero","file":"crash.jlb","line":3,"traced":true,
-  "frames":[{"name":"f","line":3,"vars":[{"name":"n","value":"3","type":"NUMBER"}]}],
+␞{"message":"can't divide by zero","file":"crash.jlb","path":"C:\\code\\crash.jlb","line":3,"traced":true,
+  "frames":[{"name":"f","line":3,"path":"C:\\code\\crash.jlb","vars":[{"name":"n","value":"3","type":"NUMBER"}]}],
   "outside":[{"name":"name","value":"\"Alex\"","type":"TEXT"}]}
 ```
 
-(It's one line; it's split here to fit.) `frames` lists the running functions, innermost first. Each value is written the way `PRINT` shows it inside a table, so text keeps its quotes.
+(It's one line; it's split here to fit.) `path` is the full path of the file the error happened in, which can be a file brought in with `IMPORT` or `LOAD`. `frames` lists the running functions, innermost first, each with the path of the file it's in. Each value is written the way `PRINT` shows it inside a table, so text keeps its quotes.
 
 **`--repl`** reads code until a line holding only `␞`, runs it, then prints `␞` and a JSON reply:
 

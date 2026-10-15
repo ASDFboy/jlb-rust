@@ -1,3 +1,5 @@
+<img src="docs/images/jlb-logo.svg" width="112" alt="The JLB logo">
+
 # jlb-rust
 
 The interpreter for **.jlb**, a small programming language, written in Rust.

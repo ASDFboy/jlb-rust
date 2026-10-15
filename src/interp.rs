@@ -95,6 +95,13 @@ fn find_point(stmts: &[Stmt], name: &str) -> Option<usize> {
     stmts.iter().position(|s| matches!(&s.kind, StmtKind::Point(p) if &**p == name))
 }
 
+fn source_path(src: &Source) -> String {
+    if src.name == "quick-try" {
+        return String::new();
+    }
+    src.dir.join(&src.name).to_string_lossy().into_owned()
+}
+
 fn fname(f: &Function) -> String {
     f.decl.name.as_deref().unwrap_or("FUNC").to_string()
 }
@@ -346,9 +353,11 @@ impl Interp {
                 msg,
                 line,
                 file: "quick-try".into(),
+                path: String::new(),
                 captured: true,
                 traced: false,
                 frames: Vec::new(),
+                frame_paths: Vec::new(),
                 outside: Vec::new(),
             }))
         };
@@ -383,9 +392,11 @@ impl Interp {
                 msg,
                 line,
                 file: name.clone(),
+                path: path.to_string_lossy().into_owned(),
                 captured: true,
                 traced: false,
                 frames: Vec::new(),
+                frame_paths: Vec::new(),
                 outside: Vec::new(),
             }))
         };
@@ -462,6 +473,7 @@ impl Interp {
         e.traced = true;
         e.line = line;
         e.file = self.frame().src.name.clone();
+        e.path = source_path(&self.frame().src);
         for fr in self.frames.iter().rev() {
             if let Some(func) = &fr.func {
                 let mut vars = Vec::new();
@@ -469,6 +481,7 @@ impl Interp {
                     vars.extend(vars_of(sc));
                 }
                 e.frames.push((fname(func), fr.line, vars));
+                e.frame_paths.push(source_path(&fr.src));
             }
         }
         e.outside = vars_of(&self.frame().env.borrow());

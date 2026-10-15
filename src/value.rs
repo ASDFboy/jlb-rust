@@ -170,12 +170,16 @@ pub struct ErrorInfo {
     pub msg: String,
     pub line: usize,
     pub file: String,
+    /// The file's full path, for editors (empty when there's no file, as in Quick-try).
+    pub path: String,
     /// Line and file have been filled in.
     pub captured: bool,
     /// Call chain and variables were recorded (false for syntax errors).
     pub traced: bool,
     /// Running functions, innermost first: (name, current line, locals).
     pub frames: Vec<(String, usize, VarList)>,
+    /// The full path of the file each of those functions is in.
+    pub frame_paths: Vec<String>,
     pub outside: VarList,
 }
 
@@ -192,9 +196,11 @@ pub fn fault(msg: impl Into<String>) -> Fault {
         msg: msg.into(),
         line: 0,
         file: String::new(),
+        path: String::new(),
         captured: false,
         traced: false,
         frames: Vec::new(),
+        frame_paths: Vec::new(),
         outside: Vec::new(),
     }))
 }

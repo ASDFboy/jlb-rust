@@ -98,12 +98,16 @@ pub fn report_json(e: &ErrorInfo) -> String {
     let frames: Vec<String> = e
         .frames
         .iter()
-        .map(|(name, line, vars)| format!("{{\"name\":{},\"line\":{},\"vars\":{}}}", json_str(name), line, vars_json(vars)))
+        .zip(e.frame_paths.iter().map(String::as_str).chain(std::iter::repeat("")))
+        .map(|((name, line, vars), path)| {
+            format!("{{\"name\":{},\"line\":{},\"path\":{},\"vars\":{}}}", json_str(name), line, json_str(path), vars_json(vars))
+        })
         .collect();
     format!(
-        "{{\"message\":{},\"file\":{},\"line\":{},\"traced\":{},\"frames\":[{}],\"outside\":{}}}",
+        "{{\"message\":{},\"file\":{},\"path\":{},\"line\":{},\"traced\":{},\"frames\":[{}],\"outside\":{}}}",
         json_str(&e.msg),
         json_str(&e.file),
+        json_str(&e.path),
         e.line,
         e.traced,
         frames.join(","),

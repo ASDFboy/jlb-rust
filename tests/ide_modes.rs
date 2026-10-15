@@ -45,9 +45,12 @@ fn ide_mode_crash_report() {
     assert_eq!(code, 1);
     assert_eq!(out, "");
     let json = err.lines().find(|l| l.starts_with('\u{1e}')).expect("JSON report line");
+    let p = file.to_str().unwrap().replace('\\', "\\\\");
     assert_eq!(
         json,
-        "\u{1e}{\"message\":\"can't divide by zero\",\"file\":\"crash.jlb\",\"line\":3,\"traced\":true,\"frames\":[{\"name\":\"f\",\"line\":3,\"vars\":[{\"name\":\"n\",\"value\":\"3\",\"type\":\"NUMBER\"},{\"name\":\"k\",\"value\":\"6\",\"type\":\"NUMBER\"}]}],\"outside\":[{\"name\":\"name\",\"value\":\"\\\"Alex\\\"\",\"type\":\"TEXT\"}]}"
+        format!(
+            "\u{1e}{{\"message\":\"can't divide by zero\",\"file\":\"crash.jlb\",\"path\":\"{p}\",\"line\":3,\"traced\":true,\"frames\":[{{\"name\":\"f\",\"line\":3,\"path\":\"{p}\",\"vars\":[{{\"name\":\"n\",\"value\":\"3\",\"type\":\"NUMBER\"}},{{\"name\":\"k\",\"value\":\"6\",\"type\":\"NUMBER\"}}]}}],\"outside\":[{{\"name\":\"name\",\"value\":\"\\\"Alex\\\"\",\"type\":\"TEXT\"}}]}}"
+        )
     );
     assert!(err.starts_with("ERROR in crash.jlb, line 3: can't divide by zero"));
 }
