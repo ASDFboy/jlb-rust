@@ -13,6 +13,7 @@
 //   MARK out                                  stop after leaving this function
 //   MARK pause                                stop as soon as possible (works while running)
 //   MARK eval <id> TAB <expression>           work out a value while stopped
+//   MARK view <id> TAB <expression>           the same, with much more of a big table
 //   MARK stop                                 end the program
 //
 // jlb answers on standard error with MARK and one line of JSON:
@@ -147,8 +148,22 @@ fn emit(json: &str) {
 
 // ---------- values as JSON ----------
 
-/// Limits how much of a big table is sent at each stop.
-struct Budget(usize);
+/// Limits how much of a big table is sent: values in all, and entries per table.
+struct Budget {
+    left: usize,
+    per_table: usize,
+}
+
+impl Budget {
+    /// For each stop (and eval): enough to look around.
+    fn small() -> Self {
+        Budget { left: 4000, per_table: 200 }
+    }
+    /// For the editor's table viewer (view): most of a big table.
+    fn large() -> Self {
+        Budget { left: 60000, per_table: 10000 }
+    }
+}
 
 fn short(v: &Value, out: &mut String, room: usize) {
     if out.len() > room {
@@ -189,7 +204,11 @@ fn short(v: &Value, out: &mut String, room: usize) {
                     out.push(']');
                     return;
                 }
-                out.push_str(k);
+                if crate::value::is_ident(k) {
+                    out.push_str(k);
+                } else {
+                    out.push_str(&quote_text(k));
+                }
                 out.push_str(": ");
                 short(&s.borrow(), out, room);
             }
@@ -200,7 +219,7 @@ fn short(v: &Value, out: &mut String, room: usize) {
 }
 
 fn value_json(name: &str, v: &Value, depth: usize, budget: &mut Budget) -> String {
-    budget.0 = budget.0.saturating_sub(1);
+    budget.left = budget.left.saturating_sub(1);
     let mut summary = String::new();
     short(v, &mut summary, 100);
     let mut o = format!("{{\"name\":{},\"type\":\"{}\",\"value\":{}", json_str(name), v.type_name(), json_str(&summary));
@@ -209,13 +228,13 @@ fn value_json(name: &str, v: &Value, depth: usize, budget: &mut Budget) -> Strin
         let mut items = Vec::new();
         if depth < 6 {
             for (i, s) in t.items.iter().enumerate() {
-                if budget.0 == 0 || items.len() >= 200 {
+                if budget.left == 0 || items.len() >= budget.per_table {
                     break;
                 }
                 items.push(value_json(&(i + 1).to_string(), &s.borrow(), depth + 1, budget));
             }
             for (k, s) in t.named.iter() {
-                if budget.0 == 0 || items.len() >= 200 {
+                if budget.left == 0 || items.len() >= budget.per_table {
                     break;
                 }
                 items.push(value_json(k, &s.borrow(), depth + 1, budget));
@@ -267,7 +286,7 @@ impl Interp {
     pub fn debug_pause(&mut self, reason: &str, message: Option<&str>) -> R<()> {
         let _ = self.out.flush();
         let d = self.debug.as_ref().unwrap();
-        let mut budget = Budget(4000);
+        let mut budget = Budget::small();
         let mut stack = Vec::new();
         for fr in self.frames.iter().rev() {
             if fr.src.name == "quick-try" {
@@ -277,17 +296,11 @@ impl Interp {
                 Some(f) => f.decl.name.as_deref().unwrap_or("FUNC").to_string(),
                 None => String::new(),
             };
+            // A function's own names (and its loop and FAIL names). At a file's top
+            // level that's only loop and FAIL names: its other names are the globals.
             let mut vars = Vec::new();
-            if fr.func.is_some() {
-                for sc in &fr.scopes {
-                    vars.extend(crate::interp::vars_of(sc));
-                }
-            } else {
-                // A file's top level: only its loop variables and FAIL names (its
-                // other names are the globals).
-                for sc in &fr.scopes {
-                    vars.extend(crate::interp::vars_of(sc));
-                }
+            for sc in &fr.scopes {
+                vars.extend(crate::interp::vars_of(sc));
             }
             stack.push(format!(
                 "{{\"name\":{},\"path\":{},\"line\":{},\"vars\":{}}}",
@@ -335,9 +348,10 @@ impl Interp {
                     d.set_breaks(arg);
                     continue;
                 }
-                "eval" => {
+                "eval" | "view" => {
                     let (id, expr) = arg.split_once('\t').unwrap_or((arg, ""));
-                    let reply = self.debug_eval(id, expr);
+                    let budget = if word == "view" { Budget::large() } else { Budget::small() };
+                    let reply = self.debug_eval(id, expr, budget);
                     emit(&reply);
                     continue;
                 }
@@ -349,7 +363,7 @@ impl Interp {
         }
     }
 
-    fn debug_eval(&mut self, id: &str, expr: &str) -> String {
+    fn debug_eval(&mut self, id: &str, expr: &str, mut budget: Budget) -> String {
         let fail = |m: &str| format!("{{\"event\":\"eval\",\"id\":{},\"ok\":false,\"message\":{}}}", json_str(id), json_str(m));
         let toks = match lexer::lex(expr) {
             Ok(t) => t,
@@ -373,7 +387,7 @@ impl Interp {
             Ok(v) => format!(
                 "{{\"event\":\"eval\",\"id\":{},\"ok\":true,\"value\":{}}}",
                 json_str(id),
-                value_json(expr, &v, 0, &mut Budget(4000))
+                value_json(expr, &v, 0, &mut budget)
             ),
             Err(Fault::Error(e)) => fail(&e.msg),
             Err(Fault::End) => fail("END can't be used here"),

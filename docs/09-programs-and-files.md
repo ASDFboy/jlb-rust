@@ -131,6 +131,7 @@ The editor sends commands as input lines starting with `␞`; any other line is 
 | `␞out` | stops once the current function has finished |
 | `␞pause` | stops as soon as possible (useful when a loop never ends) |
 | `␞eval <id><TAB><expression>` | works out an expression with the stopped function's variables |
+| `␞view <id><TAB><expression>` | the same, but sends much more of a big table (for a table viewer) |
 | `␞stop` | ends the program |
 
 When the program stops, `jlb` prints (on standard error, like the crash report) a `␞` line:
@@ -145,4 +146,4 @@ When the program stops, `jlb` prints (on standard error, like the crash report) 
 
 `reason` is `breakpoint`, `step`, `pause`, or `error`: an error that no `TRY` will catch stops the program first, with `message` saying what went wrong, so everything can still be looked at. After the editor's next command the program carries on (and for an error, ends with the usual crash report). `stack` lists the running functions, innermost first, then the file's top level (with an empty `name`), each with its own variables; `globals` are the variables outside functions. A table's `items` list its entries (up to 200 each, and a few thousand values in all); `more` counts the ones left out. When the program carries on, `jlb` prints `␞{"event":"resumed"}`.
 
-`eval` replies with `␞{"event":"eval","id":"<id>","ok":true,"value":{...}}`, or `"ok":false` and a `message`. Only expressions can be worked out, and they can't stop at breakpoints, but they can change variables (`x += 1` isn't allowed, but a function that changes a shared table is), so keep them simple.
+`eval` (and `view`) replies with `␞{"event":"eval","id":"<id>","ok":true,"value":{...}}`, or `"ok":false` and a `message`. Only expressions can be worked out, and they can't stop at breakpoints, but they can change variables (`x += 1` isn't allowed, but a function that changes a shared table is), so keep them simple.
