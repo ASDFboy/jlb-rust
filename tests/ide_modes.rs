@@ -25,10 +25,17 @@ fn check_mode() {
     assert_eq!(jlb(&["--check", "-"], "PRINT(1)\n").0, "{\"ok\":true}\n");
     let (out, _, code) = jlb(&["--check", "-"], "x = 5\ny = x != 3\n");
     assert_eq!(code, 1);
+    let e = "{\"message\":\"!= isn't an operator in .jlb; use !== (or !=== for the strict version)\",\"line\":2,\"col\":7}";
     assert_eq!(
         out,
-        "{\"ok\":false,\"message\":\"!= isn't an operator in .jlb; use !== (or !=== for the strict version)\",\"line\":2,\"col\":7}\n"
+        format!("{{\"ok\":false,\"message\":\"!= isn't an operator in .jlb; use !== (or !=== for the strict version)\",\"line\":2,\"col\":7,\"errors\":[{e}]}}\n")
     );
+    // Every problem, not just the first.
+    let (out, _, _) = jlb(&["--check", "-"], "x = 5\nIF x != 3 {\n    Print(x)\n}\nmyScore = 1\n");
+    assert!(out.contains("\"line\":2,\"col\":6}"), "{}", out);
+    assert!(out.contains("did you mean PRINT?"), "{}", out);
+    assert!(out.contains("my_score"), "{}", out);
+    assert_eq!(out.matches("\"message\"").count(), 4, "{}", out); // the first one twice, then the other two
     let (out, _, _) = jlb(&["--check", "-"], "x = 1\nIF x > 0 {\n  PRINT(x)\n");
     assert!(out.contains("\"line\":2,\"col\":10"), "{}", out);
     let (out, _, _) = jlb(&["--check", "-"], "POINT a\nPOINT a\n");
@@ -70,4 +77,15 @@ fn repl_mode() {
     assert!(lines[5].contains("can't divide by zero"));
     assert_eq!(lines[6], format!("{m}{{\"ok\":true}}"));
     assert!(lines[7].contains("x isn't defined"));
+}
+
+#[test]
+fn repl_input_asks_the_editor() {
+    let m = "\u{1e}";
+    let input = format!("n = INPUT(\"Name? \")\n{m}\nAlex\nn * -1\n{m}\n");
+    let (out, _, _) = jlb(&["--repl"], &input);
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines[0], format!("{m}{{\"input\":\"Name? \"}}"));
+    assert_eq!(lines[1], format!("{m}{{\"ok\":true}}"));
+    assert_eq!(lines[2], format!("{m}{{\"ok\":true,\"value\":\"\\\"xelA\\\"\",\"type\":\"TEXT\"}}"));
 }

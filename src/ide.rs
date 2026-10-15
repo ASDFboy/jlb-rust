@@ -44,22 +44,109 @@ fn column(src: &str, pos: usize) -> usize {
     }
 }
 
-/// `{"ok":true}`, or the first syntax problem with its line and column.
-pub fn check(src: &str) -> String {
-    let problem = match lexer::lex(src) {
+/// The first syntax problem: (message, line, character position if known).
+fn first_problem(src: &str) -> Option<(String, usize, Option<usize>)> {
+    match lexer::lex(src) {
         Err(e) => Some((e.msg, e.line, Some(e.pos))),
         Ok(toks) => match Parser::new(toks).program() {
             Err(e) => Some((e.msg, e.line, e.pos)),
             Ok(_) => None,
         },
-    };
-    match problem {
-        None => "{\"ok\":true}".into(),
-        Some((msg, line, pos)) => {
-            let col = pos.map(|p| column(src, p).to_string()).unwrap_or_else(|| "null".into());
-            format!("{{\"ok\":false,\"message\":{},\"line\":{},\"col\":{}}}", json_str(&msg), line, col)
+    }
+}
+
+/// How a line's brackets balance, ignoring text in quotes and comments:
+/// (net `{`, starts with `}`, net `(` and `[`).
+fn bracket_shape(line: &str) -> (i32, bool, i32) {
+    let mut braces = 0;
+    let mut others = 0;
+    let mut quote: Option<char> = None;
+    let mut chars = line.chars().peekable();
+    let starts_closed = line.trim_start().starts_with('}');
+    while let Some(c) = chars.next() {
+        match quote {
+            Some(q) => {
+                if q == '\'' && c == '\\' {
+                    chars.next();
+                } else if c == q {
+                    quote = None;
+                }
+            }
+            None => match c {
+                '"' | '\'' => quote = Some(c),
+                '>' if chars.peek() == Some(&'>') => break,
+                '{' => braces += 1,
+                '}' => braces -= 1,
+                '(' | '[' => others += 1,
+                ')' | ']' => others -= 1,
+                _ => {}
+            },
         }
     }
+    (braces, starts_closed, others)
+}
+
+/// A stand-in for a broken line that keeps the blocks around it in shape, so
+/// checking can carry on past it. None when there's no safe stand-in.
+fn stand_in(line: &str) -> Option<String> {
+    let (braces, starts_closed, others) = bracket_shape(line);
+    if others != 0 {
+        return None; // a list or call that runs over several lines
+    }
+    let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
+    let opens_again = starts_closed && line.trim_end().ends_with('{');
+    let fill = if opens_again {
+        // "} ELIF ... {" or "} FAIL e {": close the block above and open the next.
+        if line.contains("FAIL") { "} FAIL e_ {".to_string() } else { "} ELIF TRUE {".to_string() }
+    } else if braces > 0 {
+        "IF TRUE {".repeat(braces as usize)
+    } else if braces < 0 {
+        "}".repeat((-braces) as usize)
+    } else {
+        String::new()
+    };
+    Some(indent + &fill)
+}
+
+/// `{"ok":true}`, or the syntax problems: the first one's message, line and
+/// column, plus every problem found (up to 10) in "errors".
+pub fn check(src: &str) -> String {
+    let mut lines: Vec<String> = src.split('\n').map(str::to_string).collect();
+    let mut found: Vec<(String, usize, Option<usize>)> = Vec::new();
+    while found.len() < 10 {
+        let text = lines.join("\n");
+        let Some((msg, line, pos)) = first_problem(&text) else { break };
+        let col = pos.map(|p| column(&text, p));
+        // The same line failing again means the stand-in didn't help: stop there.
+        if found.iter().any(|f| f.1 == line) {
+            break;
+        }
+        let done = line == 0 || line > lines.len() || msg.contains("never closed");
+        found.push((msg, line, col));
+        if done {
+            break;
+        }
+        match stand_in(&lines[line - 1]) {
+            Some(s) => lines[line - 1] = s,
+            None => break,
+        }
+    }
+    if found.is_empty() {
+        return "{\"ok\":true}".into();
+    }
+    let col_text = |c: &Option<usize>| c.map(|c| c.to_string()).unwrap_or_else(|| "null".into());
+    let list: Vec<String> = found
+        .iter()
+        .map(|(m, l, c)| format!("{{\"message\":{},\"line\":{},\"col\":{}}}", json_str(m), l, col_text(c)))
+        .collect();
+    let (m, l, c) = &found[0];
+    format!(
+        "{{\"ok\":false,\"message\":{},\"line\":{},\"col\":{},\"errors\":[{}]}}",
+        json_str(m),
+        l,
+        col_text(c),
+        list.join(",")
+    )
 }
 
 pub fn run_check(arg: &str) -> i32 {
@@ -120,10 +207,12 @@ pub fn report_json(e: &ErrorInfo) -> String {
 /// `{"ok":true,"value":"5","type":"NUMBER"}` for an expression, `{"ok":true}` for
 /// statements, or `{"ok":false,"error":{...crash report...}}`.
 /// A line holding only MARK + "RESET" clears every variable.
+/// INPUT prints MARK + `{"input":"the prompt"}` and reads its answer as the next line.
 pub fn run_repl() -> i32 {
     let dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut it = Interp::new();
     it.ide = true;
+    it.repl = true;
     it.start_session(dir.clone());
     let stdin = std::io::stdin();
     let mut chunk = String::new();
@@ -138,6 +227,7 @@ pub fn run_repl() -> i32 {
         if t == format!("{}RESET", MARK) {
             it = Interp::new();
             it.ide = true;
+            it.repl = true;
             it.start_session(dir.clone());
             chunk.clear();
             println!("{}{{\"ok\":true}}", MARK);

@@ -83,11 +83,15 @@ These modes let code editors, like [JLB IDE](https://github.com/ASDFboy/jlb-ide)
 
 Lines meant for the editor start with the ASCII "record separator" character (code 30), shown here as `␞`.
 
-**`--check`** prints `{"ok":true}`, or the first problem it finds, with its line and column (`col` is `null` when the problem is a whole line):
+**`--check`** prints `{"ok":true}`, or the problems it finds. The first problem's `message`, `line` and `col` are at the top, and `errors` lists every problem found, up to 10 (`col` is `null` when the problem is a whole line):
 
 ```text
-{"ok":false,"message":"!= isn't an operator in .jlb; use !== (or !=== for the strict version)","line":2,"col":7}
+{"ok":false,"message":"!= isn't an operator in .jlb; use !== (or !=== for the strict version)","line":2,"col":7,
+  "errors":[{"message":"!= isn't an operator in .jlb; use !== (or !=== for the strict version)","line":2,"col":7},
+            {"message":"did you mean PRINT? Built-in commands are written in ALL CAPS","line":3,"col":5}]}
 ```
+
+(It's one line; it's split here to fit.) To find more than one problem, `--check` sets each broken line aside and checks again. It stops early at a problem that affects the lines after it, like a block that's never closed.
 
 **`--ide`** prints the normal crash report, then a `␞` line with the same report as JSON:
 
@@ -109,4 +113,6 @@ Lines meant for the editor start with the ASCII "record separator" character (co
 | a crash or syntax error | `{"ok":false,"error":{...the --ide report...}}` |
 
 Anything the snippet prints comes before the reply. Sending `␞RESET` clears every variable.
+
+`INPUT` works too: instead of printing its prompt, it prints `␞{"input":"the prompt"}` and reads the answer as the next line of input. The snippet then carries on.
 

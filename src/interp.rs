@@ -48,6 +48,8 @@ pub struct Interp {
     pub rng: u64,
     /// Running for an editor: output is sent right away and crashes add a JSON report.
     pub ide: bool,
+    /// Running a Quick-try session (jlb --repl): INPUT asks the editor for its answer.
+    pub repl: bool,
     imported: HashSet<PathBuf>,
     loaded: HashMap<PathBuf, Value>,
 }
@@ -302,6 +304,7 @@ impl Interp {
             last_delta: Instant::now(),
             rng: seed ^ 0x9E37_79B9_7F4A_7C15,
             ide: false,
+            repl: false,
             imported: HashSet::new(),
             loaded: HashMap::new(),
         }

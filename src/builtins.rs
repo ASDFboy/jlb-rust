@@ -317,8 +317,13 @@ pub fn call(it: &mut Interp, name: &'static str, a: Vec<Value>) -> R<Value> {
         }
         "INPUT" => {
             count(name, &a, 0, 1)?;
-            if let Some(p) = a.first() {
-                let _ = write!(it.out, "{}", display(p));
+            let prompt = a.first().map(display).unwrap_or_default();
+            if it.repl {
+                // Quick-try reads code from input, so ask the editor for the answer instead.
+                let _ = it.out.flush();
+                let _ = writeln!(it.out, "{}{{\"input\":{}}}", crate::ide::MARK, crate::ide::json_str(&prompt));
+            } else {
+                let _ = write!(it.out, "{}", prompt);
             }
             let _ = it.out.flush();
             let mut line = String::new();
