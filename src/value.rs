@@ -100,7 +100,7 @@ impl Value {
             Value::Bool(_) => "BOOL",
             Value::Null => "NULL",
             Value::Table(..) => "TABLE",
-            Value::Func(_) | Value::Builtin(_) => "FUNC",
+            Value::Func(_) | Value::Builtin(_) => "FUNCTION",
             Value::Task(_) => "TASK",
         }
     }
@@ -341,10 +341,10 @@ fn write_val(out: &mut String, v: &Value, quote: bool, depth: usize) {
         Value::Null => out.push_str("NULL"),
         Value::Func(f) => match &f.decl.name {
             Some(n) => {
-                out.push_str("FUNC ");
+                out.push_str("FUNCTION ");
                 out.push_str(n)
             }
-            None => out.push_str("FUNC"),
+            None => out.push_str("FUNCTION"),
         },
         Value::Builtin(b) => out.push_str(b),
         Value::Task(t) => {

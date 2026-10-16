@@ -119,7 +119,7 @@ fn source_path(src: &Source) -> String {
 }
 
 fn fname(f: &Function) -> String {
-    f.decl.name.as_deref().unwrap_or("FUNC").to_string()
+    f.decl.name.as_deref().unwrap_or("FUNCTION").to_string()
 }
 
 fn table_entries(t: &Table) -> Vec<(Value, Slot)> {
@@ -703,7 +703,7 @@ impl Interp {
                 env.borrow_mut().insert(n.clone(), const_slot(v));
                 Ok(())
             }
-            _ => err("GLOBAL goes before a name that gets a value, FUNC or CONST"),
+            _ => err("GLOBAL goes before a name that gets a value, DEF or CONST"),
         }
     }
 

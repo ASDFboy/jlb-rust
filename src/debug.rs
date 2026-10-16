@@ -293,7 +293,7 @@ impl Interp {
                 continue;
             }
             let name = match &fr.func {
-                Some(f) => f.decl.name.as_deref().unwrap_or("FUNC").to_string(),
+                Some(f) => f.decl.name.as_deref().unwrap_or("FUNCTION").to_string(),
                 None => String::new(),
             };
             // A function's own names (and its loop and FAIL names). At a file's top

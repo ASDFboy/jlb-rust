@@ -6,7 +6,7 @@ Case tells you who owns a name: **ALL CAPS is the language, lowercase is yours.*
 
 | Kind | Rule | Examples |
 | --- | --- | --- |
-| Keywords and built-in commands | ALL CAPS | `PRINT`, `IF`, `FUNC`, `TRUE` |
+| Keywords and built-in commands | ALL CAPS | `PRINT`, `IF`, `DEF`, `TRUE` |
 | Your variables, functions and table names | lowercase letters, digits and `_` | `score`, `player_2`, `add_points` |
 
 These rules are enforced, with a suggested fix:
@@ -83,8 +83,10 @@ REPEAT 3 { PRINT("Hello") }
 
 ```text
 IF  ELIF  ELSEIF  ELSE  WHILE  REPEAT  FOR  IN  TO  STEP  BREAK  SKIP
-FUNC  RETURN  LOCAL  GLOBAL  CONST  START  TRY  FAIL  GOTO  POINT  IMPORT  LOAD  END
+DEF  RETURN  LOCAL  GLOBAL  CONST  START  TRY  FAIL  GOTO  POINT  IMPORT  LOAD  END
 TRUE  FALSE  NULL  UNDEFINE  INSERT  DROP
 ```
+
+`FUNC` also works, as the older name for `DEF`.
 
 Every built-in command is listed in [Built-in commands](10-built-ins.md).

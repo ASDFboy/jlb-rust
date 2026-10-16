@@ -93,7 +93,7 @@ impl Interp {
             self.baton = Some(Arc::new(Baton { turn: Mutex::new(0), cv: Condvar::new() }));
         }
         let id = self.tasks.len();
-        let name: Rc<str> = Rc::from(func.decl.name.as_deref().unwrap_or("FUNC"));
+        let name: Rc<str> = Rc::from(func.decl.name.as_deref().unwrap_or("FUNCTION"));
         let mut rec = TaskRec::new(name.clone());
         // The task's first call, ready to go.
         rec.frames.push(Frame { func: Some(func.clone()), scopes: vec![OrdMap::new()], env: func.env.clone(), line, src: func.src.clone() });

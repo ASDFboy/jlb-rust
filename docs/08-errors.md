@@ -66,7 +66,7 @@ PRINT("still running")
 `ERROR("message")` raises your own error. It stops the program like a built-in error, or gets caught by `TRY`:
 
 ```text
-FUNC risky(n) {
+DEF risky(n) {
     IF n > 5 { ERROR("too big: " + n) }
     RETURN n
 }

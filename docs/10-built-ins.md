@@ -27,7 +27,7 @@ Built-ins are single ALL-CAPS words. An input shown in `[brackets]` is optional;
 | `STR(x)` | the value as text, written the way `PRINT` shows it |
 | `ENG(n)` | engineering notation: `ENG(1500)` is `"1.5e3"`, `ENG(0.002)` is `"2e-3"` |
 | `HEX(n)` | hex text for a whole number: `HEX(255)` is `"0xFF"` |
-| `TYPE(x)` | `"NUMBER"`, `"TEXT"`, `"BOOL"`, `"NULL"`, `"TABLE"`, `"FUNC"` or `"TASK"` |
+| `TYPE(x)` | `"NUMBER"`, `"TEXT"`, `"BOOL"`, `"NULL"`, `"TABLE"`, `"FUNCTION"` or `"TASK"` |
 | `LEN(x)` | the numbered items in a table, the characters in text, or the characters in a number written as text (`LEN(-2.5)` is 4) |
 
 ## Tables and text

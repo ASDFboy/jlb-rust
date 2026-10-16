@@ -3,16 +3,16 @@
 ## Running order
 
 - **A `.jlb` file runs from top to bottom.** There's no `main()` to write.
-- **Everything is defined in order as the file runs.** Calling a function before its `FUNC` line has run is an error, and so is using a variable before it has a value.
+- **Everything is defined in order as the file runs.** Calling a function before its `DEF` line has run is an error, and so is using a variable before it has a value.
 - **The check happens when a call actually runs,** so a function can call another function defined below it, as long as both exist by the time the call happens.
 
 ```text
 greet()                      >> error: greet isn't defined
-FUNC greet() { PRINT("hi") }
+DEF greet() { PRINT("hi") }
 greet()                      >> "hi"
 
-FUNC a() { RETURN b() }      >> fine: b only has to exist when a runs
-FUNC b() { RETURN "b" }
+DEF a() { RETURN b() }      >> fine: b only has to exist when a runs
+DEF b() { RETURN "b" }
 a()
 ```
 

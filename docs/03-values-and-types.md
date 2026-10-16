@@ -34,7 +34,7 @@ pos.x = 3
 | true/false | `TRUE`, `FALSE` | `"BOOL"` |
 | nothing | `NULL` | `"NULL"` |
 | table | `[1, 2]`, `[name: "Alex"]` | `"TABLE"` |
-| function | `FUNC(x) { RETURN x }`, `PRINT` | `"FUNC"` |
+| function | `DEF(x) { RETURN x }`, `PRINT` | `"FUNCTION"` |
 | task | `START f()` (see [Tasks](11-tasks.md)) | `"TASK"` |
 
 ## Numbers

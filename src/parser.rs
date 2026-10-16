@@ -168,8 +168,8 @@ impl Parser {
                     StmtKind::Repeat(c, self.loop_body()?)
                 }
                 "FOR" => self.for_stmt()?,
-                // FUNC GLOBAL name(...) is the same as GLOBAL FUNC name(...).
-                "FUNC" if matches!(self.peek_at(1), Tok::Kw("GLOBAL")) && matches!(self.peek_at(2), Tok::Name(_)) => {
+                // DEF GLOBAL name(...) is the same as GLOBAL DEF name(...).
+                "DEF" if matches!(self.peek_at(1), Tok::Kw("GLOBAL")) && matches!(self.peek_at(2), Tok::Name(_)) => {
                     self.advance();
                     self.advance();
                     let name = self.expect_name("a function name")?;
@@ -177,7 +177,7 @@ impl Parser {
                 }
                 "GLOBAL" => {
                     self.advance();
-                    let inner = if self.is_kw("FUNC") && matches!(self.peek_at(1), Tok::Name(_)) {
+                    let inner = if self.is_kw("DEF") && matches!(self.peek_at(1), Tok::Name(_)) {
                         self.advance();
                         let name = self.expect_name("a function name")?;
                         StmtKind::FuncDef(self.func_rest(Some(name))?)
@@ -186,7 +186,7 @@ impl Parser {
                     } else {
                         let name = match self.peek() {
                             Tok::Name(n) => n.clone(),
-                            _ => return self.fail("GLOBAL goes before a name that gets a value (GLOBAL score = 0), FUNC or CONST"),
+                            _ => return self.fail("GLOBAL goes before a name that gets a value (GLOBAL score = 0), DEF or CONST"),
                         };
                         match self.expr_or_assign()? {
                             k @ StmtKind::Assign(Expr::Var(_), _, _) => k,
@@ -201,7 +201,7 @@ impl Parser {
                     };
                     StmtKind::Global(Box::new(inner))
                 }
-                "FUNC" if matches!(self.peek_at(1), Tok::Name(_)) => {
+                "DEF" if matches!(self.peek_at(1), Tok::Name(_)) => {
                     self.advance();
                     let name = self.expect_name("a function name")?;
                     StmtKind::FuncDef(self.func_rest(Some(name))?)
@@ -589,7 +589,7 @@ impl Parser {
                     self.advance();
                     Ok(Expr::Null)
                 }
-                "FUNC" => {
+                "DEF" => {
                     self.advance();
                     Ok(Expr::Func(self.func_rest(None)?))
                 }

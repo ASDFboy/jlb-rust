@@ -3,7 +3,7 @@
 A task is a function running side by side with the rest of the program. `START` begins one and goes straight on:
 
 ```text
-FUNC countdown(name, n) {
+DEF countdown(name, n) {
     FOR i IN n TO 1 STEP -1 {
         PRINT(name, i)
         WAIT(0.5)
@@ -40,7 +40,7 @@ PRINT(AWAIT(a), AWAIT(b))
 - **An error in a task goes to whatever is `AWAIT`ing that task,** so `TRY` around the `AWAIT` catches it:
 
   ```text
-  FUNC load_level() { RETURN READ("level9.txt") }
+  DEF load_level() { RETURN READ("level9.txt") }
   t = START load_level()
   TRY {
       level = AWAIT(t)

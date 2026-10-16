@@ -131,7 +131,7 @@ c @= a         >> shared: c and a are the same table
 c += 4         >> a is now [1, 2, 3, 4]; b is still [1, 2, 3]
 ```
 
-- **The same rule applies to function inputs** (`FUNC f(@p)`) and `FOR` loop variables (`FOR @x IN t`).
+- **The same rule applies to function inputs** (`DEF f(@p)`) and `FOR` loop variables (`FOR @x IN t`).
 - **Numbers, TRUE/FALSE and NULL can't be changed in place,** so `@=` acts just like `=` for them.
 - **Copies are cheap.** The real copy only happens when one side changes it (copy-on-write), so `b = a` on a huge table costs nothing until you modify `b`.
 - **`a == b` checks whether two tables have the same contents.** `a === b` checks whether they're the same shared table.
@@ -143,7 +143,7 @@ c += 4         >> a is now [1, 2, 3, 4]; b is still [1, 2, 3]
 ```text
 t = ["apple", "pear", name: "Alex", greet: say_hi, inv: ["sword", "shield"]]
 PRINT(t)
->> ["apple", "pear", name: "Alex", greet: FUNC say_hi, inv: ["sword", "shield"]]
+>> ["apple", "pear", name: "Alex", greet: DEF say_hi, inv: ["sword", "shield"]]
 ```
 
 Numbered items come first, then named entries. Text keeps its quotes, so `"5"` and `5` look different.
