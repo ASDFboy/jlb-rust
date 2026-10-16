@@ -609,7 +609,7 @@ impl Parser {
                     self.advance();
                     Ok(Expr::Drop(self.args()?))
                 }
-                _ if BUILTINS.contains(&k) => {
+                _ if BUILTINS.contains(&k) || crate::graphics::NAMES.contains(&k) => {
                     self.advance();
                     Ok(Expr::Builtin(k))
                 }

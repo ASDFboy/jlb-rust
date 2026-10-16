@@ -90,6 +90,10 @@ pub enum Value {
     Builtin(&'static str),
     /// A function running side by side with the program (START).
     Task(Rc<crate::tasks::TaskHandle>),
+    /// Graphics (see graphics.rs): a picture, a window (by number), a font.
+    Image(Rc<crate::graphics::ImageBox>),
+    Window(usize),
+    Font(Rc<crate::graphics::FontBox>),
 }
 
 impl Value {
@@ -102,6 +106,9 @@ impl Value {
             Value::Table(..) => "TABLE",
             Value::Func(_) | Value::Builtin(_) => "FUNCTION",
             Value::Task(_) => "TASK",
+            Value::Image(_) => "IMAGE",
+            Value::Window(_) => "WINDOW",
+            Value::Font(_) => "FONT",
         }
     }
     pub fn new_table(t: Table) -> Value {
@@ -351,6 +358,12 @@ fn write_val(out: &mut String, v: &Value, quote: bool, depth: usize) {
             out.push_str("TASK ");
             out.push_str(&t.name)
         }
+        Value::Image(i) => out.push_str(&format!("IMAGE {}x{}", i.width(), i.height())),
+        Value::Window(id) => {
+            out.push_str("WINDOW ");
+            out.push_str(&crate::graphics::window_title(*id))
+        }
+        Value::Font(f) => out.push_str(if f.is_pixel() { "FONT pixel" } else { "FONT" }),
         Value::Table(t, _) => {
             if let Some(r) = &t.report {
                 out.push_str(r);

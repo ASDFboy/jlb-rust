@@ -98,7 +98,7 @@ To type just `jlb` from any folder, add the `windows` folder to your PATH. Searc
    cargo test --release
    ```
 
-There are no dependencies beyond Rust's standard library.
+The graphics core is C code (in `native/gfx`, shared with jlb-c), so building also needs a C compiler: Rust's usual setup already has one (Visual Studio Build Tools on Windows, GCC or Clang elsewhere). The only crate is `cc`, which compiles it. Windows use Win32 on Windows and X11 on Linux.
 
 ## Documentation
 
@@ -115,6 +115,7 @@ The full language reference is in [**docs/**](docs/README.md):
 9. [Running programs, files and modules](docs/09-programs-and-files.md)
 10. [Built-in commands](docs/10-built-ins.md)
 11. [Tasks: running things side by side](docs/11-tasks.md)
+12. [Graphics: windows, drawing and input](docs/12-graphics.md)
 
 ## Project layout
 
@@ -126,6 +127,8 @@ The full language reference is in [**docs/**](docs/README.md):
 | `src/ops.rs` | every operator: math, text and table tricks, comparisons, truth rules |
 | `src/builtins.rs` | the ALL-CAPS built-in commands |
 | `src/tasks.rs` | tasks (`START`, `AWAIT`, `DONE`, `CANCEL`): each on its own thread, taking turns |
+| `src/graphics.rs` | the graphics commands (`WINDOW`, `SHOW`, shapes, text, images, input), calling the C core |
+| `native/gfx/` | the graphics core: a copy of jlb-c's `src/gfx` (update it with `scripts/sync-gfx.sh`), built by `build.rs`, so both interpreters draw exactly the same pixels |
 | `src/value.rs` | values, tables, copy-on-write, crash reports, number formatting |
 | `src/main.rs` | the `jlb` command, including the double-click pause on Windows and the `>> @interpreter` hand-off to jlb-c |
 | `tests/cases/` | the shared test programs (`.jlb`), with expected output (`.out`) and typed input (`.in`) |

@@ -57,7 +57,7 @@ pub fn find_word(w: &str) -> Option<&'static str> {
     if w == "FUNC" {
         return Some("DEF");
     }
-    KEYWORDS.iter().chain(BUILTINS.iter()).find(|k| **k == w).copied()
+    KEYWORDS.iter().chain(BUILTINS.iter()).chain(crate::graphics::NAMES.iter()).find(|k| **k == w).copied()
 }
 
 fn snake(word: &str) -> String {

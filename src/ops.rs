@@ -251,6 +251,9 @@ fn loose_eq_d(a: &Value, b: &Value, d: usize) -> bool {
         (Func(f), Func(g)) => Rc::ptr_eq(f, g),
         (Builtin(x), Builtin(y)) => x == y,
         (Task(x), Task(y)) => x.id == y.id,
+        (Image(x), Image(y)) => Rc::ptr_eq(x, y),
+        (Window(x), Window(y)) => x == y,
+        (Font(x), Font(y)) => Rc::ptr_eq(x, y),
         _ => false,
     }
 }
@@ -266,6 +269,9 @@ pub fn strict_eq(a: &Value, b: &Value) -> bool {
         (Func(f), Func(g)) => Rc::ptr_eq(f, g),
         (Builtin(x), Builtin(y)) => x == y,
         (Task(x), Task(y)) => x.id == y.id,
+        (Image(x), Image(y)) => Rc::ptr_eq(x, y),
+        (Window(x), Window(y)) => x == y,
+        (Font(x), Font(y)) => Rc::ptr_eq(x, y),
         _ => false,
     }
 }

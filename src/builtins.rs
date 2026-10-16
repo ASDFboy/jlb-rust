@@ -543,6 +543,7 @@ pub fn call(it: &mut Interp, name: &'static str, a: Vec<Value>) -> R<Value> {
             keys.extend(t.named.iter().map(|(k, _)| Value::Text(k.clone())));
             Ok(Value::new_table(Table::from_values(keys)))
         }
+        _ if crate::graphics::NAMES.contains(&name) => crate::graphics::call(it, name, a),
         _ => err(format!("{} isn't available", name)),
     }
 }

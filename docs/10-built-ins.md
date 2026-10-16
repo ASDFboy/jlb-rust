@@ -95,6 +95,10 @@ Built-ins are single ALL-CAPS words. An input shown in `[brackets]` is optional;
 | `DONE(task)` | `TRUE` once the task has finished |
 | `CANCEL(task)` | stops a task |
 
+## Graphics
+
+Windows, drawing, text, images and input: `WINDOW`, `SHOW`, `CLEAR`, `RECT`, `CIRCLE`, `TEXT`, `IMAGE`, `DRAW`, `KEY_DOWN`, `MOUSE`, `ON_CLICK` and the rest are all in [Graphics](12-graphics.md).
+
 ## Errors and stopping
 
 | Command | What it does |

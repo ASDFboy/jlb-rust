@@ -5,6 +5,7 @@
 mod ast;
 mod builtins;
 mod debug;
+mod graphics;
 mod ide;
 mod interp;
 mod lexer;
@@ -220,5 +221,18 @@ mod tests {
         assert_eq!(asked_interpreter(">> @interpreterc"), None);
         assert_eq!(asked_interpreter("PRINT(1)"), None);
         assert_eq!(asked_interpreter(">> just a note"), None);
+    }
+
+    #[test]
+    fn graphics_core_matches() {
+        assert!(crate::graphics::check_layout(), "GfxStyle differs between Rust and C");
+        // native/gfx is a copy of jlb-c's src/gfx (scripts/sync-gfx.sh); when jlb-c sits next
+        // to this repo, the copies must be the same.
+        let c = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../jlb-c/src/gfx");
+        let Ok(dir) = std::fs::read_dir(&c) else { return };
+        for f in dir.flatten() {
+            let ours = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("native/gfx").join(f.file_name());
+            assert!(std::fs::read(f.path()).ok() == std::fs::read(&ours).ok(), "native/gfx/{:?} is out of date: run scripts/sync-gfx.sh", f.file_name());
+        }
     }
 }

@@ -66,6 +66,8 @@ pub struct Interp {
     pub steps: u32,
     /// An error (or END) from a task, waiting for the program's own code to take it.
     pub task_fault: Option<Fault>,
+    /// Windows, the drawing target and frame rate (graphics.rs).
+    pub gfx: crate::graphics::Gfx,
 }
 
 fn key_from(v: &Value) -> R<Key> {
@@ -349,6 +351,7 @@ impl Interp {
             current: 0,
             steps: 0,
             task_fault: None,
+            gfx: Default::default(),
         }
     }
 
@@ -367,7 +370,7 @@ impl Interp {
             self.imported.insert(c);
         }
         // When the program's own code ends, the tasks it started get to finish.
-        let r = self.run_module(path, env).and_then(|_| self.finish_tasks());
+        let r = self.run_module(path, env).and_then(|_| self.finish_tasks()).and_then(|_| crate::graphics::finish(self));
         let _ = self.out.flush();
         match r {
             Ok(()) | Err(Fault::End) | Err(Fault::Cancelled) => 0,
@@ -1309,6 +1312,7 @@ impl Interp {
                         let v = s.borrow().clone();
                         Ok(v)
                     }
+                    Value::Image(_) | Value::Window(_) | Value::Font(_) => crate::graphics::field(self, &bv, k),
                     Value::Null => err(format!("can't read .{} of NULL", k)),
                     o => err(format!("can't read .{} of a {}", k, o.type_name())),
                 }
@@ -1401,6 +1405,17 @@ impl Interp {
     fn call(&mut self, c: &Expr, args: &[Expr]) -> R<Value> {
         let f = self.eval(c)?;
         match f {
+            // DRAW_TO(name) of an image: drawing goes into that variable's own image.
+            Value::Builtin("DRAW_TO") if args.len() == 1 && crate::ast::is_lvalue(&args[0]) => {
+                let s = self.lvalue_slot(&args[0])?;
+                let is_img = matches!(&*s.borrow(), Value::Image(_));
+                if is_img {
+                    crate::graphics::draw_to_slot(self, s)?;
+                    return Ok(Value::Null);
+                }
+                let v = s.borrow().clone();
+                crate::graphics::call(self, "DRAW_TO", vec![v])
+            }
             Value::Builtin(name) => {
                 let mut v = Vec::with_capacity(args.len());
                 for a in args {
@@ -1459,7 +1474,7 @@ impl Interp {
         self.enter_call(func, decl, vals)
     }
 
-    fn enter_call(&mut self, func: Rc<Function>, decl: Rc<FuncDecl>, vals: Vec<Slot>) -> R<Value> {
+    pub(crate) fn enter_call(&mut self, func: Rc<Function>, decl: Rc<FuncDecl>, vals: Vec<Slot>) -> R<Value> {
         if self.frames.len() >= MAX_DEPTH {
             return err("too many function calls inside each other (is a function calling itself forever?)");
         }
