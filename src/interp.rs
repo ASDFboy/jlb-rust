@@ -601,8 +601,20 @@ impl Interp {
         }
     }
 
+    /// A name of the running function (its locals, FOR and FAIL names), or, outside
+    /// functions, any name. Inside a function, outside names are only read.
+    fn lookup_own(&self, name: &str) -> Option<Slot> {
+        let f = self.frame();
+        if f.func.is_none() {
+            return self.lookup(name);
+        }
+        f.scopes.iter().rev().find_map(|s| s.get(name).cloned())
+    }
+
+    /// Giving a value to a name: inside a function it's the function's own (a new local
+    /// unless it already is one); GLOBAL is how a function changes an outside name.
     pub fn set_var(&mut self, name: &Rc<str>, v: Value) -> R<()> {
-        match self.lookup(name) {
+        match self.lookup_own(name) {
             Some(s) => {
                 const_name(&s, name)?;
                 *s.borrow_mut() = v;
@@ -613,7 +625,7 @@ impl Interp {
     }
 
     fn bind_var(&mut self, name: &Rc<str>, s: Slot) -> R<()> {
-        if let Some(old) = self.lookup(name) {
+        if let Some(old) = self.lookup_own(name) {
             const_name(&old, name)?;
         }
         let f = self.frame_mut();
@@ -623,13 +635,76 @@ impl Interp {
                 return Ok(());
             }
         }
-        let in_env = f.env.borrow().get(name).is_some();
+        let in_env = f.func.is_none() && f.env.borrow().get(name).is_some();
         if in_env {
             f.env.borrow_mut().insert(name.clone(), s);
             return Ok(());
         }
         self.create_var(name.clone(), s);
         Ok(())
+    }
+
+    /// GLOBAL name = ..., GLOBAL FUNC name, GLOBAL CONST name: the file's outside name,
+    /// even inside a function.
+    fn exec_global(&mut self, k: &StmtKind) -> R<()> {
+        let env = self.frame().env.clone();
+        match k {
+            StmtKind::Assign(Expr::Var(n), op, rhs) => {
+                let old = env.borrow().get(n).cloned();
+                if let Some(s) = &old {
+                    const_name(s, n)?;
+                }
+                match *op {
+                    "=" => {
+                        let v = copy_val(self.eval(rhs)?);
+                        match old {
+                            Some(s) => *s.borrow_mut() = v,
+                            None => {
+                                env.borrow_mut().insert(n.clone(), new_slot(v));
+                            }
+                        }
+                        Ok(())
+                    }
+                    "@=" => {
+                        let s = self.share_slot(rhs)?;
+                        env.borrow_mut().insert(n.clone(), s);
+                        Ok(())
+                    }
+                    _ => {
+                        let Some(slot) = old else { return err(format!("{} has no outside value yet, so GLOBAL {} {} can't change it", n, n, op)) };
+                        let r = self.eval(rhs)?;
+                        self.compound(&slot, op, r)
+                    }
+                }
+            }
+            StmtKind::FuncDef(d) => {
+                let name = d.name.clone().unwrap();
+                if let Some(s) = env.borrow().get(&name) {
+                    const_name(s, &name)?;
+                }
+                let f = self.make_func(d);
+                let old = env.borrow().get(&name).cloned();
+                match old {
+                    Some(s) => *s.borrow_mut() = f,
+                    None => {
+                        env.borrow_mut().insert(name, new_slot(f));
+                    }
+                }
+                Ok(())
+            }
+            StmtKind::Const(n, e) => {
+                if env.borrow().get(n).is_some() {
+                    return err(format!(
+                        "{} already has an outside value, so CONST can't make it a constant. Use CONST where {} first gets its value",
+                        n, n
+                    ));
+                }
+                let v = self.eval(e)?;
+                env.borrow_mut().insert(n.clone(), const_slot(v));
+                Ok(())
+            }
+            _ => err("GLOBAL goes before a name that gets a value, FUNC or CONST"),
+        }
     }
 
     /// CONST name = value: a new name in this function (or file) that can never change.
@@ -756,6 +831,10 @@ impl Interp {
             StmtKind::Const(name, e) => {
                 let v = self.eval(e)?;
                 self.make_const(name, v)?;
+                Ok(Flow::Normal)
+            }
+            StmtKind::Global(k) => {
+                self.exec_global(k)?;
                 Ok(Flow::Normal)
             }
             StmtKind::Local(name, e) => {
@@ -1062,7 +1141,16 @@ impl Interp {
                     let v = copy_val(self.eval(rhs)?);
                     return self.set_var(n, v);
                 }
-                let slot = self.lookup(n).map_or_else(|| err(format!("{} isn't defined", n)), Ok)?;
+                let slot = match self.lookup_own(n) {
+                    Some(s) => s,
+                    None if self.lookup(n).is_some() => {
+                        return err(format!(
+                            "{} isn't one of this function's own variables, so {} {} can't change it. To change the outside {}, write GLOBAL {} {} ...",
+                            n, n, op, n, n, op
+                        ))
+                    }
+                    None => return err(format!("{} isn't defined", n)),
+                };
                 const_name(&slot, n)?;
                 let r = self.eval(rhs)?;
                 self.compound(&slot, op, r)

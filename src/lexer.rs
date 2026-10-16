@@ -31,7 +31,7 @@ pub struct LexError {
 
 pub const KEYWORDS: &[&str] = &[
     "IF", "ELIF", "ELSEIF", "ELSE", "WHILE", "REPEAT", "FOR", "IN", "TO", "STEP", "BREAK", "SKIP",
-    "FUNC", "RETURN", "LOCAL", "CONST", "START", "TRY", "FAIL", "GOTO", "POINT", "IMPORT", "LOAD", "END", "TRUE",
+    "FUNC", "RETURN", "LOCAL", "GLOBAL", "CONST", "START", "TRY", "FAIL", "GOTO", "POINT", "IMPORT", "LOAD", "END", "TRUE",
     "FALSE", "NULL", "UNDEFINE", "INSERT", "DROP",
 ];
 

@@ -51,6 +51,8 @@ pub enum StmtKind {
     Assign(Expr, &'static str, Expr),
     Local(Rc<str>, Option<Expr>),
     Const(Rc<str>, Expr),
+    /// GLOBAL before an assignment, FUNC or CONST: it's for the file's outside name.
+    Global(Box<StmtKind>),
     If(Vec<(Expr, Vec<Stmt>)>, Option<Vec<Stmt>>),
     While(Expr, Vec<Stmt>),
     Repeat(Expr, Vec<Stmt>),

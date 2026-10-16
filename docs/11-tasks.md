@@ -31,7 +31,7 @@ PRINT(AWAIT(a), AWAIT(b))
 - **One runs at a time, and they take turns.** A task runs about a thousand statements, then the next one gets a turn. `WAIT` and `AWAIT` hand over straight away.
 - **Turns go round in order,** so the same program does the same thing every time (unless it `WAIT`s for real time to pass). Both interpreters take turns the same way.
 - **Two tasks never change a variable at the same moment,** so `box.count += 1` from several tasks always adds up. A task can still see a value change between its turns.
-- **Tasks share the program's outside variables,** like any function. Inputs work as usual: copies, or shared with `@` in the function's inputs.
+- **Tasks share the program's outside variables,** like any function (reading them, changing table entries, or `GLOBAL` to give them a value). Inputs work as usual: copies, or shared with `@` in the function's inputs.
 - **When the program's own code ends, the tasks it started get to finish** before it stops. `END` stops everything at once.
 - **Tasks can start tasks,** and any task can `AWAIT` any other one.
 

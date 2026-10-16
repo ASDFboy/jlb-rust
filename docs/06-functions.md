@@ -18,21 +18,41 @@ PRINT(add(2, 3))      >> 5
 
 A function sees its own local variables and the file's outside variables:
 
-- **Assigning to a name that already exists outside the function changes the outside variable.**
-- **A name first created inside the function is local,** and disappears when the function finishes.
+- **A function can read the file's outside variables.**
+- **A name given a value inside a function is the function's own** (a local), even if an outside variable has the same name. It disappears when the function finishes. The same goes for functions made inside a function.
+- **`GLOBAL` before the name** gives the value to the outside name instead.
 
 ```text
 score = 10
 FUNC add_points(amount) {
-    score += amount          >> changes the outside score
-    bonus = amount * 2       >> new name, so it's local
+    PRINT(score)             >> 10: outside names can be read
+    bonus = amount * 2       >> local
+    GLOBAL score += amount   >> changes the outside score
     RETURN bonus
 }
 ```
 
+### GLOBAL
+
+`GLOBAL` works with every way of giving a value, and with `FUNC` and `CONST`:
+
+```text
+FUNC setup() {
+    GLOBAL lives = 3                 >> a new outside name (or changes it)
+    GLOBAL lives -= 1
+    GLOBAL pool @= [1, 2]            >> shared, like @=
+    GLOBAL FUNC reset() { ... }      >> a function the whole file can use (FUNC GLOBAL reset() works too)
+    GLOBAL CONST max_hp = 100        >> an outside constant
+}
+```
+
+- **Without `GLOBAL`, `x += 1` inside a function needs `x` to be the function's own.** Changing an outside `x` that way is an error that says to write `GLOBAL x += 1`. (`x = x + 1` makes a local `x` from the outside one.)
+- **The entries of an outside table can be changed directly:** `hero.hp -= 5` changes the outside `hero` when the function has no `hero` of its own.
+- **`GLOBAL` goes before a name,** not a table entry, and outside functions it changes nothing.
+
 ### LOCAL
 
-`LOCAL` makes a local variable even when an outside variable has the same name:
+Names given a value in a function are already local, so `LOCAL` is only needed to make one before it has a value (`LOCAL x` starts as `NULL`), or to say so clearly:
 
 ```text
 count = 3
@@ -44,14 +64,13 @@ FUNC count_enemies() {
 >> outside, count is still 3
 ```
 
-`LOCAL x` on its own starts as `NULL`. `LOCAL` can only be used inside a function.
+`LOCAL` can only be used inside a function.
 
 ### What counts as local
 
 A function's locals are:
 
-- anything declared with `LOCAL`;
-- any new name first created inside it;
+- every name given a value inside it without `GLOBAL` (including with `LOCAL`, `CONST` and `FUNC`);
 - its inputs.
 
 A `FOR` loop's variables (and a `FAIL` block's error name) are different: they exist only inside that loop's `{ }` block, in or out of a function.

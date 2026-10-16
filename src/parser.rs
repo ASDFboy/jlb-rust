@@ -168,6 +168,39 @@ impl Parser {
                     StmtKind::Repeat(c, self.loop_body()?)
                 }
                 "FOR" => self.for_stmt()?,
+                // FUNC GLOBAL name(...) is the same as GLOBAL FUNC name(...).
+                "FUNC" if matches!(self.peek_at(1), Tok::Kw("GLOBAL")) && matches!(self.peek_at(2), Tok::Name(_)) => {
+                    self.advance();
+                    self.advance();
+                    let name = self.expect_name("a function name")?;
+                    StmtKind::Global(Box::new(StmtKind::FuncDef(self.func_rest(Some(name))?)))
+                }
+                "GLOBAL" => {
+                    self.advance();
+                    let inner = if self.is_kw("FUNC") && matches!(self.peek_at(1), Tok::Name(_)) {
+                        self.advance();
+                        let name = self.expect_name("a function name")?;
+                        StmtKind::FuncDef(self.func_rest(Some(name))?)
+                    } else if self.is_kw("CONST") {
+                        self.const_stmt()?
+                    } else {
+                        let name = match self.peek() {
+                            Tok::Name(n) => n.clone(),
+                            _ => return self.fail("GLOBAL goes before a name that gets a value (GLOBAL score = 0), FUNC or CONST"),
+                        };
+                        match self.expr_or_assign()? {
+                            k @ StmtKind::Assign(Expr::Var(_), _, _) => k,
+                            StmtKind::Assign(..) => {
+                                return self.fail(format!(
+                                    "GLOBAL goes before a name, not a table entry. {} is the outside one already when the function has no {} of its own",
+                                    name, name
+                                ))
+                            }
+                            _ => return self.fail(format!("GLOBAL {} needs a value: GLOBAL {} = ...", name, name)),
+                        }
+                    };
+                    StmtKind::Global(Box::new(inner))
+                }
                 "FUNC" if matches!(self.peek_at(1), Tok::Name(_)) => {
                     self.advance();
                     let name = self.expect_name("a function name")?;
@@ -213,15 +246,7 @@ impl Parser {
                     };
                     StmtKind::Local(name, v)
                 }
-                "CONST" => {
-                    self.advance();
-                    let name = self.expect_name("a name after CONST")?;
-                    if !self.is_op("=") {
-                        return self.fail(&format!("CONST {} needs a value: CONST {} = ...", name, name));
-                    }
-                    self.advance();
-                    StmtKind::Const(name, self.expr()?)
-                }
+                "CONST" => self.const_stmt()?,
                 "TRY" => {
                     self.advance();
                     let body = self.block()?;
@@ -265,6 +290,16 @@ impl Parser {
             _ => self.expr_or_assign()?,
         };
         Ok(Stmt { kind, line })
+    }
+
+    fn const_stmt(&mut self) -> PR<StmtKind> {
+        self.advance();
+        let name = self.expect_name("a name after CONST")?;
+        if !self.is_op("=") {
+            return self.fail(&format!("CONST {} needs a value: CONST {} = ...", name, name));
+        }
+        self.advance();
+        Ok(StmtKind::Const(name, self.expr()?))
     }
 
     fn expr_or_assign(&mut self) -> PR<StmtKind> {
