@@ -9,26 +9,61 @@ use crate::ast::FuncDecl;
 use crate::number::Number;
 
 /// A variable or table entry. `@` sharing makes two names point at the same slot.
-pub type Slot = Rc<RefCell<Value>>;
+pub type Slot = Rc<SlotData>;
+
+/// What a slot holds, and whether it's a constant (made by CONST, which freezes
+/// everything inside it too, so no name or table entry can change it).
+pub struct SlotData {
+    v: RefCell<Value>,
+    constant: Cell<bool>,
+}
+
+impl SlotData {
+    pub fn borrow(&self) -> std::cell::Ref<'_, Value> {
+        self.v.borrow()
+    }
+    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, Value> {
+        self.v.borrow_mut()
+    }
+    pub fn is_const(&self) -> bool {
+        self.constant.get()
+    }
+}
 /// A file's global variables.
 pub type Env = Rc<RefCell<OrdMap>>;
 
 pub fn new_slot(v: Value) -> Slot {
-    Rc::new(RefCell::new(v))
+    Rc::new(SlotData { v: RefCell::new(v), constant: Cell::new(false) })
 }
 
-thread_local! {
-    static NEXT_ID: Cell<u64> = const { Cell::new(1) };
+/// A constant slot holding a frozen copy of `v`: its tables (and the tables inside
+/// them) are copied into constant slots of their own, so nothing shared with an
+/// ordinary variable gets frozen.
+pub fn const_slot(v: Value) -> Slot {
+    Rc::new(SlotData { v: RefCell::new(freeze(v)), constant: Cell::new(true) })
 }
+
+fn freeze(v: Value) -> Value {
+    match v {
+        Value::Table(rc, _) => {
+            let mut named = OrdMap::new();
+            for (k, s) in rc.named.iter() {
+                named.insert(k.clone(), const_slot(s.borrow().clone()));
+            }
+            let t = Table { items: rc.items.iter().map(|s| const_slot(s.borrow().clone())).collect(), named, report: rc.report.clone() };
+            Value::new_table(t)
+        }
+        o => o,
+    }
+}
+
+/// Shared by every task's thread (see tasks.rs).
+static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 /// Every logical table copy gets its own identity, so `===` can tell a copy
 /// from the same shared table even while copy-on-write keeps the data shared.
 pub fn new_id() -> u64 {
-    NEXT_ID.with(|c| {
-        let v = c.get();
-        c.set(v + 1);
-        v
-    })
+    NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 pub struct Source {
@@ -53,6 +88,8 @@ pub enum Value {
     Table(Rc<Table>, u64),
     Func(Rc<Function>),
     Builtin(&'static str),
+    /// A function running side by side with the program (START).
+    Task(Rc<crate::tasks::TaskHandle>),
 }
 
 impl Value {
@@ -64,6 +101,7 @@ impl Value {
             Value::Null => "NULL",
             Value::Table(..) => "TABLE",
             Value::Func(_) | Value::Builtin(_) => "FUNC",
+            Value::Task(_) => "TASK",
         }
     }
     pub fn new_table(t: Table) -> Value {
@@ -189,6 +227,11 @@ pub enum Fault {
     Error(Box<ErrorInfo>),
     /// END: stops the program; not an error, and TRY doesn't catch it.
     End,
+    /// The task was stopped with CANCEL; it unwinds without running anything else.
+    Cancelled,
+    /// An error in a task that nothing was AWAITing: it stops the program, and TRY
+    /// (in whatever the program happened to be doing) doesn't catch it.
+    TaskError(Box<ErrorInfo>),
 }
 
 pub type R<T> = Result<T, Fault>;
@@ -304,6 +347,10 @@ fn write_val(out: &mut String, v: &Value, quote: bool, depth: usize) {
             None => out.push_str("FUNC"),
         },
         Value::Builtin(b) => out.push_str(b),
+        Value::Task(t) => {
+            out.push_str("TASK ");
+            out.push_str(&t.name)
+        }
         Value::Table(t, _) => {
             if let Some(r) = &t.report {
                 out.push_str(r);

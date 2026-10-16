@@ -1,5 +1,6 @@
 // jlb: interpreter for the .jlb language.
 // Usage: jlb [--pause | --ide] <file.jlb>, jlb --check <file.jlb | ->, jlb --repl, jlb --debug <file.jlb>
+// A program whose first line is `>> @interpreter c` is handed to jlb-c (next to jlb).
 
 mod ast;
 mod builtins;
@@ -10,10 +11,80 @@ mod lexer;
 mod number;
 mod ops;
 mod parser;
+mod tasks;
 mod value;
 
 use std::io::{BufRead, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+/// The interpreter a program's first line asks for, like `>> @interpreter c`
+/// (lowercased), or None when it doesn't ask.
+pub fn asked_interpreter(first_line: &str) -> Option<String> {
+    let l = first_line.trim_start_matches('\u{feff}').trim();
+    let rest = l.strip_prefix(">>")?;
+    if rest.starts_with('>') {
+        return None; // a >>> comment
+    }
+    let rest = rest.trim_start().strip_prefix("@interpreter")?;
+    if !rest.starts_with(char::is_whitespace) {
+        return None;
+    }
+    Some(rest.trim().to_lowercase())
+}
+
+fn first_line(path: &Path) -> String {
+    let mut line = String::new();
+    if let Ok(f) = std::fs::File::open(path) {
+        let _ = std::io::BufReader::new(f).read_line(&mut line);
+    }
+    line
+}
+
+/// Runs the program with jlb-c instead, when its first line asks for it. Gives back
+/// the exit code to finish with, or None to run it here.
+fn hand_off(path: &Path, for_ide: bool) -> Option<i32> {
+    let asked = asked_interpreter(&first_line(path))?;
+    match asked.as_str() {
+        "rust" => return None,
+        "c" => {}
+        other => {
+            eprintln!("ERROR in {}, line 1: there's no interpreter called {}. Use >> @interpreter rust or >> @interpreter c", path.display(), other);
+            return Some(1);
+        }
+    }
+    // Already handed over once: run here rather than going back and forth.
+    if std::env::var_os("JLB_HANDED_OFF").is_some() {
+        return None;
+    }
+    let name = if cfg!(windows) { "jlb-c.exe" } else { "jlb-c" };
+    let exe = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join(name)));
+    let Some(exe) = exe.filter(|e| e.is_file()) else {
+        eprintln!("ERROR in {}, line 1: this program asks for the C interpreter (>> @interpreter c), but {} isn't in the same folder as jlb", path.display(), name);
+        return Some(2);
+    };
+    let mut cmd = std::process::Command::new(exe);
+    if for_ide {
+        cmd.arg("--ide");
+    }
+    cmd.arg(path).env("JLB_HANDED_OFF", "1");
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        let e = cmd.exec(); // only comes back if it couldn't start
+        eprintln!("ERROR: couldn't start the C interpreter: {}", e);
+        Some(2)
+    }
+    #[cfg(not(unix))]
+    {
+        match cmd.status() {
+            Ok(st) => Some(st.code().unwrap_or(1)),
+            Err(e) => {
+                eprintln!("ERROR: couldn't start the C interpreter: {}", e);
+                Some(2)
+            }
+        }
+    }
+}
 
 /// True when jlb has a console window all to itself, which on Windows means it
 /// was started by double-clicking a .jlb file rather than from a terminal.
@@ -114,6 +185,13 @@ fn main() {
             path = abs;
         }
     }
+    // `>> @interpreter c` on the first line hands the program to jlb-c.
+    if let Some(code) = hand_off(&path, for_ide) {
+        if pause {
+            wait_for_enter();
+        }
+        std::process::exit(code);
+    }
     // A large stack lets .jlb programs recurse deeply; it is only reserved, not used up front.
     let child = std::thread::Builder::new()
         .stack_size(256 * 1024 * 1024)
@@ -128,4 +206,19 @@ fn main() {
         wait_for_enter();
     }
     std::process::exit(code);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::asked_interpreter;
+
+    #[test]
+    fn reads_the_interpreter_line() {
+        assert_eq!(asked_interpreter(">> @interpreter c\n").as_deref(), Some("c"));
+        assert_eq!(asked_interpreter("\u{feff}  >>   @interpreter   Rust  \r\n").as_deref(), Some("rust"));
+        assert_eq!(asked_interpreter(">>> @interpreter c <<<"), None);
+        assert_eq!(asked_interpreter(">> @interpreterc"), None);
+        assert_eq!(asked_interpreter("PRINT(1)"), None);
+        assert_eq!(asked_interpreter(">> just a note"), None);
+    }
 }

@@ -391,6 +391,8 @@ impl Interp {
             ),
             Err(Fault::Error(e)) => fail(&e.msg),
             Err(Fault::End) => fail("END can't be used here"),
+            Err(Fault::Cancelled) => fail("the task was cancelled"),
+            Err(Fault::TaskError(e)) => fail(&e.msg),
         }
     }
 }

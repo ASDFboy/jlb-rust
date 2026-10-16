@@ -7,6 +7,24 @@ value = 10
 value = "hello"      >> fine: the type can change
 ```
 
+### Constants
+
+`CONST` gives a name a value that can never change:
+
+```text
+CONST max_hp = 100
+CONST start = [x: 0, y: 0]
+max_hp = 50          >> error: max_hp is a constant (CONST), so it can't be changed
+start.x = 3          >> error: a constant's tables can't be changed either
+pos = start          >> a copy, which can be changed like any other table
+pos.x = 3
+```
+
+- **Nothing about a constant changes:** not with `=`, `+=` and the others, `@=`, `UNDEFINE`, `INSERT` or `DROP`, and not through a name that shares it with `@`.
+- **CONST makes a new name.** It's an error if the name already has a value in the same place (the file's outside names, or a function's own locals).
+- **Inside a function, CONST makes a local constant,** like `LOCAL`: it's gone when the function finishes.
+- **A copy of a constant is an ordinary value.** `LOAD` gives copies too, so `tools.max_hp` can be changed in your copy without touching the file's constant.
+
 `TYPE(x)` tells you what something is:
 
 | Type | Examples | `TYPE` gives |
@@ -17,6 +35,7 @@ value = "hello"      >> fine: the type can change
 | nothing | `NULL` | `"NULL"` |
 | table | `[1, 2]`, `[name: "Alex"]` | `"TABLE"` |
 | function | `FUNC(x) { RETURN x }`, `PRINT` | `"FUNC"` |
+| task | `START f()` (see [Tasks](11-tasks.md)) | `"TASK"` |
 
 ## Numbers
 

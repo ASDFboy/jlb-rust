@@ -31,7 +31,7 @@ pub struct LexError {
 
 pub const KEYWORDS: &[&str] = &[
     "IF", "ELIF", "ELSEIF", "ELSE", "WHILE", "REPEAT", "FOR", "IN", "TO", "STEP", "BREAK", "SKIP",
-    "FUNC", "RETURN", "LOCAL", "TRY", "FAIL", "GOTO", "POINT", "IMPORT", "LOAD", "END", "TRUE",
+    "FUNC", "RETURN", "LOCAL", "CONST", "START", "TRY", "FAIL", "GOTO", "POINT", "IMPORT", "LOAD", "END", "TRUE",
     "FALSE", "NULL", "UNDEFINE", "INSERT", "DROP",
 ];
 
@@ -41,6 +41,7 @@ pub const BUILTINS: &[&str] = &[
     "LOWER", "SPLIT", "JOIN", "FIND", "ABS", "MIN", "MAX", "TABLE_MIN", "TABLE_MAX", "SIN", "COS",
     "TAN", "CSC", "SEC", "COT", "ASIN", "ACOS", "ATAN", "RAD_SIN", "RAD_COS", "RAD_TAN", "RAD_CSC",
     "RAD_SEC", "RAD_COT", "RAD_ASIN", "RAD_ACOS", "RAD_ATAN", "PI", "SORT", "ALPHA_SORT", "KEYS",
+    "AWAIT", "DONE", "CANCEL",
 ];
 
 // Longest first, so "!===" wins over "!==" and so on.

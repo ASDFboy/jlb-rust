@@ -21,6 +21,8 @@ pub enum Expr {
     Unary(&'static str, Box<Expr>),
     Binary(&'static str, Box<Expr>, Box<Expr>),
     Func(Rc<FuncDecl>),
+    /// START f(x): runs a call as a task. Always holds an Expr::Call.
+    Start(Box<Expr>),
     Undefine(Box<Expr>),
     Insert(Vec<Expr>),
     Drop(Vec<Expr>),
@@ -48,6 +50,7 @@ pub enum StmtKind {
     Expr(Expr),
     Assign(Expr, &'static str, Expr),
     Local(Rc<str>, Option<Expr>),
+    Const(Rc<str>, Expr),
     If(Vec<(Expr, Vec<Stmt>)>, Option<Vec<Stmt>>),
     While(Expr, Vec<Stmt>),
     Repeat(Expr, Vec<Stmt>),

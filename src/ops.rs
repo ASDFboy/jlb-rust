@@ -250,6 +250,7 @@ fn loose_eq_d(a: &Value, b: &Value, d: usize) -> bool {
         (Table(x, _), Table(y, _)) => Rc::ptr_eq(x, y) || tables_eq(x, y, d),
         (Func(f), Func(g)) => Rc::ptr_eq(f, g),
         (Builtin(x), Builtin(y)) => x == y,
+        (Task(x), Task(y)) => x.id == y.id,
         _ => false,
     }
 }
@@ -264,6 +265,7 @@ pub fn strict_eq(a: &Value, b: &Value) -> bool {
         (Table(_, i), Table(_, j)) => i == j,
         (Func(f), Func(g)) => Rc::ptr_eq(f, g),
         (Builtin(x), Builtin(y)) => x == y,
+        (Task(x), Task(y)) => x.id == y.id,
         _ => false,
     }
 }

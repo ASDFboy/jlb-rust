@@ -242,8 +242,8 @@ pub fn run_repl() -> i32 {
         let reply = match it.run_snippet(&chunk) {
             Ok(Some(v)) => format!("{{\"ok\":true,\"value\":{},\"type\":\"{}\"}}", json_str(&repr(&v)), v.type_name()),
             Ok(None) => "{\"ok\":true}".into(),
-            Err(Fault::End) => "{\"ok\":true,\"ended\":true}".into(),
-            Err(Fault::Error(e)) => format!("{{\"ok\":false,\"error\":{}}}", report_json(&e)),
+            Err(Fault::End) | Err(Fault::Cancelled) => "{\"ok\":true,\"ended\":true}".into(),
+            Err(Fault::Error(e)) | Err(Fault::TaskError(e)) => format!("{{\"ok\":false,\"error\":{}}}", report_json(&e)),
         };
         let _ = it.out.flush();
         chunk.clear();

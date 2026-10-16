@@ -394,9 +394,25 @@ pub fn call(it: &mut Interp, name: &'static str, a: Vec<Value>) -> R<Value> {
             count(name, &a, 1, 1)?;
             let s = number(name, &a[0])?.to_f64();
             let _ = it.out.flush();
-            if s > 0.0 {
+            if it.baton.is_some() {
+                // With tasks running, the others get to run meanwhile.
+                it.task_sleep(s)?;
+            } else if s > 0.0 {
                 std::thread::sleep(Duration::from_secs_f64(s.min(1e9)));
             }
+            Ok(Value::Null)
+        }
+        "AWAIT" => {
+            count(name, &a, 1, 1)?;
+            it.await_tasks(&a[0])
+        }
+        "DONE" => {
+            count(name, &a, 1, 1)?;
+            Ok(Value::Bool(it.task_done(&a[0])?))
+        }
+        "CANCEL" => {
+            count(name, &a, 1, 1)?;
+            it.cancel_task(&a[0])?;
             Ok(Value::Null)
         }
         "UPPER" | "LOWER" => {

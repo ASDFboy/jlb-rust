@@ -27,7 +27,7 @@ Built-ins are single ALL-CAPS words. An input shown in `[brackets]` is optional;
 | `STR(x)` | the value as text, written the way `PRINT` shows it |
 | `ENG(n)` | engineering notation: `ENG(1500)` is `"1.5e3"`, `ENG(0.002)` is `"2e-3"` |
 | `HEX(n)` | hex text for a whole number: `HEX(255)` is `"0xFF"` |
-| `TYPE(x)` | `"NUMBER"`, `"TEXT"`, `"BOOL"`, `"NULL"`, `"TABLE"` or `"FUNC"` |
+| `TYPE(x)` | `"NUMBER"`, `"TEXT"`, `"BOOL"`, `"NULL"`, `"TABLE"`, `"FUNC"` or `"TASK"` |
 | `LEN(x)` | the numbered items in a table, the characters in text, or the characters in a number written as text (`LEN(-2.5)` is 4) |
 
 ## Tables and text
@@ -84,7 +84,16 @@ Built-ins are single ALL-CAPS words. An input shown in `[brackets]` is optional;
 | --- | --- |
 | `TIME([decimals])` | seconds since the program started |
 | `DELTA_TIME([decimals])` | seconds since the last `DELTA_TIME()` call (the first call counts from the start) |
-| `WAIT(seconds)` | pauses the program |
+| `WAIT(seconds)` | pauses the program (while [tasks](11-tasks.md) are running, the others carry on) |
+
+## Tasks
+
+| Command | What it does |
+| --- | --- |
+| `START f(x)` | runs a call as a task and gives back the task (see [Tasks](11-tasks.md)) |
+| `AWAIT(task)` | waits for a task (or a table of them) and gives back what it returned |
+| `DONE(task)` | `TRUE` once the task has finished |
+| `CANCEL(task)` | stops a task |
 
 ## Errors and stopping
 

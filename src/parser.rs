@@ -213,6 +213,15 @@ impl Parser {
                     };
                     StmtKind::Local(name, v)
                 }
+                "CONST" => {
+                    self.advance();
+                    let name = self.expect_name("a name after CONST")?;
+                    if !self.is_op("=") {
+                        return self.fail(&format!("CONST {} needs a value: CONST {} = ...", name, name));
+                    }
+                    self.advance();
+                    StmtKind::Const(name, self.expr()?)
+                }
                 "TRY" => {
                     self.advance();
                     let body = self.block()?;
@@ -438,6 +447,14 @@ impl Parser {
         if self.is_op("!") {
             self.advance();
             return Ok(Expr::Unary("!", Box::new(self.unary()?)));
+        }
+        if self.is_kw("START") {
+            self.advance();
+            let call = self.postfix()?;
+            if !matches!(call, Expr::Call(..)) {
+                return self.fail("START needs a function call after it, like START walk(hero)");
+            }
+            return Ok(Expr::Start(Box::new(call)));
         }
         self.power()
     }

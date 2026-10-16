@@ -30,6 +30,20 @@ UNDEFINE(player.score)       >> removes that entry from the table
 
 `UNDEFINE` takes the name itself, not its value. If two names share a table through `@=`, it removes only the name you give it.
 
+## Choosing the interpreter
+
+A program can say which interpreter runs it, on its first line:
+
+```text
+>> @interpreter c
+PRINT("this always runs with jlb-c")
+```
+
+- **`rust` or `c`.** It's a comment, so it changes nothing else.
+- **It wins over everything else:** run with the other interpreter (or double-clicked, or picked in the IDE), the program is handed over to the one it asks for. That interpreter has to be in the same folder as the other one, as it is when they come with the IDE.
+- **Only the program's own first line counts.** Files brought in with `IMPORT` and `LOAD` follow the program.
+- **Compare in the IDE still runs both,** since that's what it's for.
+
 ## IMPORT and LOAD
 
 Both run another `.jlb` file. They differ in how you reach what it defines:

@@ -114,6 +114,7 @@ The full language reference is in [**docs/**](docs/README.md):
 8. [Errors](docs/08-errors.md)
 9. [Running programs, files and modules](docs/09-programs-and-files.md)
 10. [Built-in commands](docs/10-built-ins.md)
+11. [Tasks: running things side by side](docs/11-tasks.md)
 
 ## Project layout
 
@@ -124,8 +125,9 @@ The full language reference is in [**docs/**](docs/README.md):
 | `src/interp.rs` | runs the program: variables, scope, loops, functions, GOTO, errors, IMPORT/LOAD |
 | `src/ops.rs` | every operator: math, text and table tricks, comparisons, truth rules |
 | `src/builtins.rs` | the ALL-CAPS built-in commands |
+| `src/tasks.rs` | tasks (`START`, `AWAIT`, `DONE`, `CANCEL`): each on its own thread, taking turns |
 | `src/value.rs` | values, tables, copy-on-write, crash reports, number formatting |
-| `src/main.rs` | the `jlb` command, including the double-click pause on Windows |
+| `src/main.rs` | the `jlb` command, including the double-click pause on Windows and the `>> @interpreter` hand-off to jlb-c |
 | `tests/cases/` | the shared test programs (`.jlb`), with expected output (`.out`) and typed input (`.in`) |
 | `windows/` | `install.bat`, `uninstall.bat` and a prebuilt `jlb.exe` |
 | `examples/` | small programs to try |

@@ -58,6 +58,14 @@ pub struct Interp {
     pub try_depth: usize,
     imported: HashSet<PathBuf>,
     loaded: HashMap<PathBuf, Value>,
+    /// Tasks (see tasks.rs): empty until the first START. Task 0 is the program itself.
+    pub tasks: Vec<crate::tasks::TaskRec>,
+    pub baton: Option<std::sync::Arc<crate::tasks::Baton>>,
+    /// Which task is running, and how many statements it has run this turn.
+    pub current: usize,
+    pub steps: u32,
+    /// An error (or END) from a task, waiting for the program's own code to take it.
+    pub task_fault: Option<Fault>,
 }
 
 fn key_from(v: &Value) -> R<Key> {
@@ -156,7 +164,16 @@ fn get_entry(bs: &Slot, key: &Key) -> R<Value> {
     index_get(&b, &kv)
 }
 
+/// Changing an entry of a table held by a constant isn't allowed.
+fn not_const(bs: &Slot) -> R<()> {
+    if bs.is_const() {
+        return err("this is a constant (CONST), so it can't be changed");
+    }
+    Ok(())
+}
+
 fn set_entry(bs: &Slot, key: &Key, v: Value) -> R<()> {
+    not_const(bs)?;
     let mut b = bs.borrow_mut();
     match &mut *b {
         Value::Table(rc, _) => {
@@ -164,6 +181,7 @@ fn set_entry(bs: &Slot, key: &Key, v: Value) -> R<()> {
             match key {
                 Key::Name(n) => {
                     if let Some(s) = t.named.get(n) {
+                        not_const(s)?;
                         *s.borrow_mut() = v;
                     } else {
                         t.named.insert(n.clone(), new_slot(v));
@@ -173,6 +191,7 @@ fn set_entry(bs: &Slot, key: &Key, v: Value) -> R<()> {
                 Key::Pos(p) => {
                     let len = t.items.len();
                     if let Some(i) = resolve(*p, len) {
+                        not_const(&t.items[i])?;
                         *t.items[i].borrow_mut() = v;
                         return Ok(());
                     }
@@ -210,6 +229,7 @@ fn set_entry(bs: &Slot, key: &Key, v: Value) -> R<()> {
 }
 
 fn set_entry_slot(bs: &Slot, key: &Key, sh: Slot) -> R<()> {
+    not_const(bs)?;
     let mut b = bs.borrow_mut();
     match &mut *b {
         Value::Table(rc, _) => {
@@ -235,6 +255,14 @@ fn set_entry_slot(bs: &Slot, key: &Key, sh: Slot) -> R<()> {
         }
         o => err(format!("@= can only share into a table, not a {}", o.type_name())),
     }
+}
+
+/// A variable made with CONST can't be given another value.
+fn const_name(s: &Slot, name: &str) -> R<()> {
+    if s.is_const() {
+        return err(format!("{} is a constant (CONST), so it can't be changed", name));
+    }
+    Ok(())
 }
 
 fn insert_index(p: i64, len: usize) -> R<usize> {
@@ -316,6 +344,11 @@ impl Interp {
             try_depth: 0,
             imported: HashSet::new(),
             loaded: HashMap::new(),
+            tasks: Vec::new(),
+            baton: None,
+            current: 0,
+            steps: 0,
+            task_fault: None,
         }
     }
 
@@ -333,17 +366,24 @@ impl Interp {
         if let Ok(c) = path.canonicalize() {
             self.imported.insert(c);
         }
-        let r = self.run_module(path, env);
+        // When the program's own code ends, the tasks it started get to finish.
+        let r = self.run_module(path, env).and_then(|_| self.finish_tasks());
         let _ = self.out.flush();
         match r {
-            Ok(()) | Err(Fault::End) => 0,
-            Err(Fault::Error(e)) => {
-                eprintln!("{}", report(&e));
-                if self.ide {
-                    eprintln!("{}{}", crate::ide::MARK, crate::ide::report_json(&e));
-                }
+            Ok(()) | Err(Fault::End) | Err(Fault::Cancelled) => 0,
+            Err(Fault::Error(e)) | Err(Fault::TaskError(e)) => {
+                self.report_error(&e);
                 1
             }
+        }
+    }
+
+    /// Writes an error report (and, for an editor, its JSON form).
+    pub fn report_error(&mut self, e: &ErrorInfo) {
+        let _ = self.out.flush();
+        eprintln!("{}", report(e));
+        if self.ide {
+            eprintln!("{}{}", crate::ide::MARK, crate::ide::report_json(e));
         }
     }
 
@@ -357,6 +397,15 @@ impl Interp {
 
     /// Runs a snippet in the session. A single expression gives back its value.
     pub fn run_snippet(&mut self, text: &str) -> R<Option<Value>> {
+        // Tasks a snippet starts finish before its answer comes back.
+        let r = self.run_snippet_code(text).and_then(|v| self.finish_tasks().map(|_| v));
+        if r.is_err() {
+            self.cancel_all_tasks();
+        }
+        r
+    }
+
+    fn run_snippet_code(&mut self, text: &str) -> R<Option<Value>> {
         // Tidy up after an earlier error, which can leave loop scopes or calls behind.
         self.frames.truncate(1);
         self.frames[0].scopes.clear();
@@ -470,7 +519,7 @@ impl Interp {
                 v
             }
         };
-        self.set_var(&Rc::from(stem.as_str()), copy_val(v));
+        self.set_var(&Rc::from(stem.as_str()), copy_val(v))?;
         Ok(())
     }
 
@@ -552,27 +601,52 @@ impl Interp {
         }
     }
 
-    pub fn set_var(&mut self, name: &Rc<str>, v: Value) {
+    pub fn set_var(&mut self, name: &Rc<str>, v: Value) -> R<()> {
         match self.lookup(name) {
-            Some(s) => *s.borrow_mut() = v,
+            Some(s) => {
+                const_name(&s, name)?;
+                *s.borrow_mut() = v;
+            }
             None => self.create_var(name.clone(), new_slot(v)),
         }
+        Ok(())
     }
 
-    fn bind_var(&mut self, name: &Rc<str>, s: Slot) {
+    fn bind_var(&mut self, name: &Rc<str>, s: Slot) -> R<()> {
+        if let Some(old) = self.lookup(name) {
+            const_name(&old, name)?;
+        }
         let f = self.frame_mut();
         for sc in f.scopes.iter_mut().rev() {
             if sc.get(name).is_some() {
                 sc.insert(name.clone(), s);
-                return;
+                return Ok(());
             }
         }
         let in_env = f.env.borrow().get(name).is_some();
         if in_env {
             f.env.borrow_mut().insert(name.clone(), s);
-            return;
+            return Ok(());
         }
-        self.create_var(name.clone(), s)
+        self.create_var(name.clone(), s);
+        Ok(())
+    }
+
+    /// CONST name = value: a new name in this function (or file) that can never change.
+    fn make_const(&mut self, name: &Rc<str>, v: Value) -> R<()> {
+        let f = self.frame_mut();
+        let exists = match f.func {
+            Some(_) => f.scopes[0].get(name).is_some(),
+            None => f.env.borrow().get(name).is_some(),
+        };
+        if exists {
+            return err(format!(
+                "{} already has a value here, so CONST can't make it a constant. Use CONST where {} first gets its value",
+                name, name
+            ));
+        }
+        self.create_var(name.clone(), const_slot(v));
+        Ok(())
     }
 
     fn remove_var(&mut self, name: &str) -> bool {
@@ -631,6 +705,13 @@ impl Interp {
 
     fn exec_stmt(&mut self, s: &Stmt) -> R<Flow> {
         self.frame_mut().line = s.line;
+        // With tasks running, each one gets a turn every so many statements.
+        if self.baton.is_some() {
+            if let Err(mut f) = self.tick() {
+                self.capture(&mut f, s.line);
+                return Err(f);
+            }
+        }
         if self.debug.is_some() {
             self.debug_check(s.line)?;
         }
@@ -670,6 +751,11 @@ impl Interp {
             }
             StmtKind::Assign(t, op, rhs) => {
                 self.assign(t, op, rhs)?;
+                Ok(Flow::Normal)
+            }
+            StmtKind::Const(name, e) => {
+                let v = self.eval(e)?;
+                self.make_const(name, v)?;
                 Ok(Flow::Normal)
             }
             StmtKind::Local(name, e) => {
@@ -733,7 +819,7 @@ impl Interp {
             StmtKind::End => Err(Fault::End),
             StmtKind::FuncDef(d) => {
                 let f = self.make_func(d);
-                self.set_var(d.name.as_ref().unwrap(), f);
+                self.set_var(d.name.as_ref().unwrap(), f)?;
                 Ok(Flow::Normal)
             }
             StmtKind::Try(body, name, fail) => match {
@@ -831,6 +917,12 @@ impl Interp {
     fn loop_entries(&mut self, iter: &Expr, want_slots: bool) -> R<Vec<(Value, Slot)>> {
         if want_slots && is_lvalue(iter) {
             let s = self.lvalue_slot(iter)?;
+            // A constant's entries are constants too, so they're shared as they are.
+            if s.is_const() {
+                if let Value::Table(rc, _) = &*s.borrow() {
+                    return Ok(table_entries(rc));
+                }
+            }
             let mut v = s.borrow_mut();
             if let Value::Table(rc, _) = &mut *v {
                 return Ok(table_entries(Rc::make_mut(rc)));
@@ -930,6 +1022,18 @@ impl Interp {
                 Key::Pos(_) => err("use .name to reach a function's local variable"),
             };
         }
+        if bs.is_const() {
+            // Nothing to copy first: nothing in a constant changes.
+            if let Value::Table(t, _) = &*bs.borrow() {
+                return match key {
+                    Key::Name(n) => t.named.get(n).cloned().map_or_else(|| err(format!("the table has no entry named {}", n)), Ok),
+                    Key::Pos(p) => match resolve(*p, t.items.len()) {
+                        Some(i) => Ok(t.items[i].clone()),
+                        None => err(format!("position {} is outside the table", p)),
+                    },
+                };
+            }
+        }
         let mut v = bs.borrow_mut();
         match &mut *v {
             Value::Table(rc, _) => {
@@ -952,15 +1056,14 @@ impl Interp {
             Expr::Var(n) => {
                 if op == "@=" {
                     let s = self.share_slot(rhs)?;
-                    self.bind_var(n, s);
-                    return Ok(());
+                    return self.bind_var(n, s);
                 }
                 if op == "=" {
                     let v = copy_val(self.eval(rhs)?);
-                    self.set_var(n, v);
-                    return Ok(());
+                    return self.set_var(n, v);
                 }
                 let slot = self.lookup(n).map_or_else(|| err(format!("{} isn't defined", n)), Ok)?;
+                const_name(&slot, n)?;
                 let r = self.eval(rhs)?;
                 self.compound(&slot, op, r)
             }
@@ -978,6 +1081,7 @@ impl Interp {
     }
 
     fn compound(&mut self, slot: &Slot, op: &str, r: Value) -> R<()> {
+        not_const(slot)?;
         let base = &op[..op.len() - 1];
         // Fast path: `table += value` adds to the end in place.
         if base == "+" && !matches!(r, Value::Table(..)) {
@@ -1000,6 +1104,7 @@ impl Interp {
                 Key::Pos(_) => return err("use .name to reach a function's local variable"),
             };
             let s = self.func_local(&f, &n)?;
+            const_name(&s, &n)?;
             if op == "=" || op == "@=" {
                 let v = copy_val(self.eval(rhs)?);
                 *s.borrow_mut() = v;
@@ -1024,6 +1129,9 @@ impl Interp {
     fn undefine(&mut self, t: &Expr) -> R<()> {
         match t {
             Expr::Var(n) => {
+                if let Some(s) = self.lookup(n) {
+                    const_name(&s, n)?;
+                }
                 if self.remove_var(n) {
                     Ok(())
                 } else {
@@ -1054,6 +1162,7 @@ impl Interp {
             }
             return err(format!("{} has no local variable named {}", fname(&f), n));
         }
+        not_const(bs)?;
         let mut v = bs.borrow_mut();
         match &mut *v {
             Value::Table(rc, _) => {
@@ -1142,6 +1251,7 @@ impl Interp {
             }
             Expr::Binary(op, a, b) => self.binary(op, a, b),
             Expr::Func(d) => Ok(self.make_func(d)),
+            Expr::Start(call) => self.start(call),
             Expr::Undefine(t) => {
                 self.undefine(t)?;
                 Ok(Value::Null)
@@ -1216,15 +1326,28 @@ impl Interp {
         }
     }
 
-    fn call_func(&mut self, func: Rc<Function>, args: &[Expr]) -> R<Value> {
-        let decl = func.decl.clone();
-        let params = &decl.params;
+    /// START f(x): works out f and its inputs here, then runs it as a task.
+    fn start(&mut self, call: &Expr) -> R<Value> {
+        let Expr::Call(c, args) = call else { return err("START needs a function call") };
+        let func = match self.eval(c)? {
+            Value::Func(f) => f,
+            Value::Builtin(b) => return err(format!("START runs your own functions, not built-in commands like {}", b)),
+            o => return err(format!("START needs a function, not a {}", o.type_name())),
+        };
+        let vals = self.call_args(&func, args)?;
+        let line = self.frame().line;
+        self.start_task(func, vals, line)
+    }
+
+    /// A call's inputs: copies, or shared slots for @ inputs.
+    fn call_args(&mut self, func: &Rc<Function>, args: &[Expr]) -> R<Vec<Slot>> {
+        let params = &func.decl.params;
         let has_rest = params.last().is_some_and(|p| p.rest);
         let fixed = params.len() - has_rest as usize;
         if args.len() > fixed && !has_rest {
             return err(format!(
                 "{} takes at most {} input{}, but got {}",
-                fname(&func),
+                fname(func),
                 fixed,
                 if fixed == 1 { "" } else { "s" },
                 args.len()
@@ -1239,6 +1362,16 @@ impl Interp {
                 vals.push(new_slot(copy_val(v)));
             }
         }
+        Ok(vals)
+    }
+
+    fn call_func(&mut self, func: Rc<Function>, args: &[Expr]) -> R<Value> {
+        let decl = func.decl.clone();
+        let vals = self.call_args(&func, args)?;
+        self.enter_call(func, decl, vals)
+    }
+
+    fn enter_call(&mut self, func: Rc<Function>, decl: Rc<FuncDecl>, vals: Vec<Slot>) -> R<Value> {
         if self.frames.len() >= MAX_DEPTH {
             return err("too many function calls inside each other (is a function calling itself forever?)");
         }
@@ -1255,7 +1388,7 @@ impl Interp {
         r
     }
 
-    fn run_call(&mut self, func: &Rc<Function>, decl: &FuncDecl, vals: Vec<Slot>) -> R<Value> {
+    pub fn run_call(&mut self, func: &Rc<Function>, decl: &FuncDecl, vals: Vec<Slot>) -> R<Value> {
         let mut it = vals.into_iter();
         for p in &decl.params {
             if p.rest {
@@ -1297,6 +1430,7 @@ impl Interp {
         }
         if is_lvalue(&args[0]) {
             let s = self.lvalue_slot(&args[0])?;
+            not_const(&s)?;
             let mut v = s.borrow_mut();
             apply_action(&mut v, insert, &extra)?;
             return Ok(copy_val(v.clone()));

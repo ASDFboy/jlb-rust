@@ -12,6 +12,7 @@ This is the complete reference for the .jlb language, as run by this interpreter
 8. [Errors](08-errors.md): crash reports, TRY/FAIL, ERROR
 9. [Running programs, files and modules](09-programs-and-files.md): running order, IMPORT, LOAD, UNDEFINE
 10. [Built-in commands](10-built-ins.md): every ALL-CAPS command
+11. [Tasks](11-tasks.md): START, AWAIT, DONE, CANCEL: things happening at the same time
 
 ## Quick reference
 
@@ -34,6 +35,8 @@ BREAK  SKIP  GOTO name  POINT name  END
 
 FUNC name(a, b = 1, @shared, ...rest) { RETURN a }
 LOCAL x = 0      name.x            FUNC(x) { RETURN x * 2 }
+CONST max = 10                     a name that can never change
+t = START f(x)    AWAIT(t)         run f(x) side by side, then wait for its result
 TRY { } FAIL err { }               ERROR("message")
 IMPORT "file.jlb"                  LOAD "file.jlb"
 UNDEFINE(x)
