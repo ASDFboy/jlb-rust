@@ -57,6 +57,7 @@ FOR i, c IN "ab" { PRINT(i, c) }    >> 1 a / 2 b
 
   ```text
   FOR @enemy IN enemies { enemy.health -= 10 }   >> changes the real enemies
+  FOR @n IN scores { n *= 2 }                     >> doubles every number in scores
   FOR key, @value IN t { ... }
   ```
 

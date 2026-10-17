@@ -100,11 +100,6 @@ pub fn resolve(p: i64, len: usize) -> Option<usize> {
     }
 }
 
-/// Only tables and text can be changed in place, so only they are truly shared by `@`.
-fn shareable(v: &Value) -> bool {
-    matches!(v, Value::Table(..) | Value::Text(_))
-}
-
 pub fn vars_of(m: &OrdMap) -> Vec<(Rc<str>, Value)> {
     m.iter().filter(|(_, s)| !s.borrow().is_func()).map(|(k, s)| (k.clone(), s.borrow().clone())).collect()
 }
@@ -1025,7 +1020,7 @@ impl Interp {
         let want = a.shared || b.is_some_and(|x| x.shared);
         let entries = self.loop_entries(iter, want)?;
         let bind = |lv: &LoopVar, s: &Slot| -> Slot {
-            if lv.shared && shareable(&s.borrow()) {
+            if lv.shared {
                 s.clone()
             } else {
                 new_slot(copy_val(s.borrow().clone()))
@@ -1064,12 +1059,8 @@ impl Interp {
 
     fn share_slot(&mut self, e: &Expr) -> R<Slot> {
         if is_lvalue(e) {
-            let s = self.lvalue_slot(e)?;
-            if shareable(&s.borrow()) {
-                return Ok(s);
-            }
-            let v = s.borrow().clone();
-            return Ok(new_slot(v));
+            // Every kind of value is shared: both names hold the same variable.
+            return self.lvalue_slot(e);
         }
         Ok(new_slot(self.eval(e)?))
     }

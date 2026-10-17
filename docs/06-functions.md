@@ -137,7 +137,14 @@ DEF no_change(p) { p.score += 10 }     >> changes only its own copy
 player = [score: 0]
 add_bonus(player)      >> player.score is now 10
 no_change(player)      >> player.score is still 10
+
+DEF lose_life(@n) { n -= 1 }           >> numbers (and every other type) share too
+lives = 3
+lose_life(lives)       >> lives is now 2
+lose_life(player.score)   >> a table entry: player.score is now 9
 ```
+
+Passing something that isn't a name or a table entry (like `lose_life(5)`) gives the input that value, with nothing outside to change.
 
 `@` combines with defaults: `DEF heal(@p, amount = 10)`. See [copying and sharing](07-tables-and-text.md#copying-and-sharing).
 

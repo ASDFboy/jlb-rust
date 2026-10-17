@@ -120,19 +120,26 @@ FOR c IN "Alex" { }      >> loops over each character
 
 ## Copying and sharing
 
-`=` copies tables and text. The copy is complete: tables inside a table are copied too, so nothing stays secretly shared.
+`=` copies. The copy is complete: tables inside a table are copied too, so nothing stays secretly shared.
 
-`@=` shares instead. Both names then point at the same table or text, so a change through one shows up in the other:
+`@=` shares instead. Both names then hold the same variable, whatever is in it, so a change through one shows up in the other:
 
 ```text
 a = [1, 2, 3]
 b = a          >> copy: changing b leaves a alone
 c @= a         >> shared: c and a are the same table
 c += 4         >> a is now [1, 2, 3, 4]; b is still [1, 2, 3]
+
+lives = 3
+also @= lives
+also -= 1      >> lives is 2 too
+also = "none"  >> and now lives is "none"
 ```
 
 - **The same rule applies to function inputs** (`DEF f(@p)`) and `FOR` loop variables (`FOR @x IN t`).
-- **Numbers, TRUE/FALSE and NULL can't be changed in place,** so `@=` acts just like `=` for them.
+- **Every type is shared:** tables, text, numbers, TRUE/FALSE, NULL and functions. Giving either name a new value with `=` gives it to both.
+- **Sharing a table's entry works too:** after `hp @= hero.hp`, `hp -= 3` changes `hero.hp`.
+- **Sharing something that isn't a name** (like `x @= 5` or `x @= a + 1`) just gives `x` that value, since there's nothing to share.
 - **Copies are cheap.** The real copy only happens when one side changes it (copy-on-write), so `b = a` on a huge table costs nothing until you modify `b`.
 - **`a == b` checks whether two tables have the same contents.** `a === b` checks whether they're the same shared table.
 
