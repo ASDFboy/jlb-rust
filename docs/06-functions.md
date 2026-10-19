@@ -44,6 +44,7 @@ DEF setup() {
     GLOBAL pool @= [1, 2]            >> shared, like @=
     GLOBAL DEF reset() { ... }      >> a function the whole file can use (DEF GLOBAL reset() works too)
     GLOBAL CONST max_hp = 100        >> an outside constant
+    GLOBAL high_score                >> an outside name holding NULL (unless it already has a value)
 }
 ```
 
@@ -53,7 +54,7 @@ DEF setup() {
 
 ### LOCAL
 
-Names given a value in a function are already local, so `LOCAL` is only needed to make one before it has a value (`LOCAL x` starts as `NULL`), or to say so clearly:
+Names given a value in a function are already local, so `LOCAL` is only needed to make one before it has a value (`LOCAL x` starts as `NULL`, and so does `x` on a line by itself), or to say so clearly:
 
 ```text
 count = 3

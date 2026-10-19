@@ -20,6 +20,7 @@ This is the complete reference for the .jlb language, as run by this interpreter
 ```text
 >> comment                         >>> multi-line comment <<<
 x = 10                             copy a value into x
+x                                  on a line by itself: x is NULL (if it had no value)
 y @= x                             share x: y and x are then the same variable
 "raw text"   'text with \n codes'  [1, 2, name: "Alex"]
 TRUE  FALSE  NULL

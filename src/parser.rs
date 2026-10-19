@@ -190,6 +190,7 @@ impl Parser {
                         };
                         match self.expr_or_assign()? {
                             k @ StmtKind::Assign(Expr::Var(_), _, _) => k,
+                            k @ StmtKind::Expr(Expr::Var(_)) => k,
                             StmtKind::Assign(..) => {
                                 return self.fail(format!(
                                     "GLOBAL goes before a name, not a table entry. {} is the outside one already when the function has no {} of its own",

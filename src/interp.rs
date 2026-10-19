@@ -425,6 +425,9 @@ impl Interp {
         if let [s] = prog.as_slice() {
             if let StmtKind::Expr(e) = &s.kind {
                 self.frame_mut().line = s.line;
+                if let Expr::Var(n) = e {
+                    self.declare(n);
+                }
                 return match self.eval(e) {
                     // A command that gives back nothing (like PRINT) shows no result.
                     Ok(Value::Null) if matches!(e, Expr::Call(..)) => Ok(None),
@@ -599,6 +602,14 @@ impl Interp {
         }
     }
 
+    /// `name` on a line by itself: a new variable holding NULL (the function's own, inside
+    /// a function, like LOCAL), unless the name already has a value here.
+    fn declare(&mut self, name: &Rc<str>) {
+        if self.lookup_own(name).is_none() {
+            self.create_var(name.clone(), new_slot(Value::Null));
+        }
+    }
+
     /// A name of the running function (its locals, FOR and FAIL names), or, outside
     /// functions, any name. Inside a function, outside names are only read.
     fn lookup_own(&self, name: &str) -> Option<Slot> {
@@ -647,6 +658,13 @@ impl Interp {
     fn exec_global(&mut self, k: &StmtKind) -> R<()> {
         let env = self.frame().env.clone();
         match k {
+            // GLOBAL name by itself: the outside name, made with NULL if it has no value yet.
+            StmtKind::Expr(Expr::Var(n)) => {
+                if env.borrow().get(n).is_none() {
+                    env.borrow_mut().insert(n.clone(), new_slot(Value::Null));
+                }
+                Ok(())
+            }
             StmtKind::Assign(Expr::Var(n), op, rhs) => {
                 let old = env.borrow().get(n).cloned();
                 if let Some(s) = &old {
@@ -818,6 +836,11 @@ impl Interp {
 
     fn exec_kind(&mut self, s: &Stmt) -> R<Flow> {
         match &s.kind {
+            // A name by itself makes that variable, with NULL, unless it already has a value.
+            StmtKind::Expr(Expr::Var(n)) => {
+                self.declare(n);
+                Ok(Flow::Normal)
+            }
             StmtKind::Expr(e) => {
                 self.eval(e)?;
                 Ok(Flow::Normal)

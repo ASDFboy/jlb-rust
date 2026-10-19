@@ -7,6 +7,15 @@ value = 10
 value = "hello"      >> fine: the type can change
 ```
 
+A name on a line by itself makes a variable that holds `NULL`, ready to get a value later:
+
+```text
+save_data            >> save_data is NULL
+PRINT(save_data)     >> NULL
+```
+
+If the name already has a value, writing it by itself changes nothing. Inside a function it makes the function's own variable, like `LOCAL`.
+
 ### Constants
 
 `CONST` gives a name a value that can never change:

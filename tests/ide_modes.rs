@@ -65,7 +65,7 @@ fn ide_mode_crash_report() {
 #[test]
 fn repl_mode() {
     let m = "\u{1e}";
-    let input = format!("x = 5\n{m}\nx * 2\n{m}\n\"25\" * 2\n{m}\nPRINT(x)\n{m}\nx / 0\n{m}\n{m}RESET\nx\n{m}\n");
+    let input = format!("x = 5\n{m}\nx * 2\n{m}\n\"25\" * 2\n{m}\nPRINT(x)\n{m}\nx / 0\n{m}\n{m}RESET\nx + 1\n{m}\n");
     let (out, _, code) = jlb(&["--repl"], &input);
     assert_eq!(code, 0);
     let lines: Vec<&str> = out.lines().collect();
