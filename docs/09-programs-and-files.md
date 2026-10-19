@@ -67,6 +67,7 @@ Both run another `.jlb` file. They differ in how you reach what it defines:
 | `READ_LINES("save.txt")` | a table with one item per line |
 | `WRITE("save.txt", value)` | replaces the file's contents, creating the file if it doesn't exist |
 | `EXISTS("save.txt")` | TRUE or FALSE |
+| `DELETE("save.txt")` | removes the file for good (it doesn't go to the Recycle Bin). It's an error if there's no such file, and it won't remove a folder. |
 
 File paths are relative to the folder `jlb` is run from. When a program is double-clicked on Windows, that's the program's own folder.
 

@@ -400,6 +400,18 @@ pub fn call(it: &mut Interp, name: &'static str, a: Vec<Value>) -> R<Value> {
             std::fs::write(&p, display(&a[1])).map_err(|e| fault(format!("couldn't write the file {}: {}", p, e)))?;
             Ok(Value::Null)
         }
+        "DELETE" => {
+            count(name, &a, 1, 1)?;
+            let p = display(&a[0]);
+            match std::fs::metadata(&p) {
+                Err(_) => err(format!("couldn't delete {}: there's no such file", p)),
+                Ok(m) if m.is_dir() => err(format!("couldn't delete {}: it's a folder, and DELETE only removes files", p)),
+                Ok(_) => {
+                    std::fs::remove_file(&p).map_err(|e| fault(format!("couldn't delete the file {}: {}", p, e)))?;
+                    Ok(Value::Null)
+                }
+            }
+        }
         "EXISTS" => {
             count(name, &a, 1, 1)?;
             Ok(Value::Bool(std::path::Path::new(&display(&a[0])).exists()))

@@ -19,6 +19,7 @@ Built-ins are single ALL-CAPS words. An input shown in `[brackets]` is optional;
 | `READ_LINES(path)` | a table with one item per line |
 | `WRITE(path, value)` | replaces the file's contents (creating it if needed) |
 | `EXISTS(path)` | TRUE or FALSE |
+| `DELETE(path)` | removes the file for good (not to the Recycle Bin); an error if it isn't there, or is a folder |
 
 ## Conversion and inspection
 
