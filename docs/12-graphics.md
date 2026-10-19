@@ -9,7 +9,7 @@ speed = 2
 WHILE WINDOW_OPEN() {
     x += speed
     IF x > 300 || x < 20 { speed = -speed }
-    CLEAR("navy")
+    CLEAR_WINDOW("navy")
     CIRCLE(x, 90, 12, "orange")
     TEXT(10, 170, "Press Escape to stop", "white", [anchor: 1])
     IF KEY_PRESSED("escape") { WINDOW_CLOSE() }
@@ -92,7 +92,7 @@ The positions are where the shape's anchor goes (its center unless the `anchor` 
 
 | Command | Draws |
 | --- | --- |
-| `CLEAR([color])` | the whole window (or image) in one color (black if none) |
+| `CLEAR_WINDOW([color])` | the whole window (or image) in one color (black if none). (`CLEAR()` is different: it wipes the printed output.) |
 | `PIXEL(x, y, color)` | one pixel |
 | `GET_PIXEL(x, y)` | gives back the color there (`NULL` outside the picture) |
 | `LINE(x1, y1, x2, y2, color, [width])` | a straight line |
@@ -171,13 +171,13 @@ A handler is an ordinary function, called when something happens. It's given as 
 
 ```text
 WINDOW(200, 200, "Click to draw", 2)
-CLEAR("white")
+CLEAR_WINDOW("white")
 DEF dot(x, y, button) {
     >> Draws where the mouse was clicked: red for left, blue for anything else.
     IF button == "left" { CIRCLE(x, y, 5, "red") } ELSE { CIRCLE(x, y, 5, "blue") }
 }
 ON_CLICK(dot)
-ON_KEY("c", DEF() { CLEAR("white") })
+ON_KEY("c", DEF() { CLEAR_WINDOW("white") })
 ```
 
 ## For tests

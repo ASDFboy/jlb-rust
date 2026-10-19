@@ -40,9 +40,10 @@ CONST max = 10                     a name that can never change
 GLOBAL x = 1                       in a function: the outside x (names are local there otherwise)
 t = START f(x)    AWAIT(t)         run f(x) side by side, then wait for its result
 TRY { } FAIL err { }               ERROR("message")
+CLEAR()                            wipe everything printed so far
 IMPORT "file.jlb"                  LOAD "file.jlb"
 UNDEFINE(x)
 
-WINDOW(320, 180)   CLEAR("navy")   CIRCLE(x, y, 10, "red")   SHOW()
+WINDOW(320, 180)   CLEAR_WINDOW("navy")   CIRCLE(x, y, 10, "red")   SHOW()
 KEY_DOWN("left")   MOUSE().x      ON_CLICK(f)     DRAW(IMAGE("hero.png"), x, y)
 ```

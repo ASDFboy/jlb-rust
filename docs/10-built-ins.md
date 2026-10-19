@@ -14,6 +14,7 @@ Built-ins are single ALL-CAPS words. An input shown in `[brackets]` is optional;
 | --- | --- |
 | `PRINT(a, b, ...)` | prints its inputs separated by spaces, then a new line. Text prints without quotes. |
 | `INPUT([prompt])` | shows the prompt, then gives back the typed line as text |
+| `CLEAR()` | wipes everything printed so far: clears the terminal window, or JLB IDE's Output panel. When output goes to a file, it does nothing. |
 | `READ(path)` | the whole file as text |
 | `READ_LINES(path)` | a table with one item per line |
 | `WRITE(path, value)` | replaces the file's contents (creating it if needed) |
@@ -97,7 +98,7 @@ Built-ins are single ALL-CAPS words. An input shown in `[brackets]` is optional;
 
 ## Graphics
 
-Windows, drawing, text, images and input: `WINDOW`, `SHOW`, `CLEAR`, `RECT`, `CIRCLE`, `TEXT`, `IMAGE`, `DRAW`, `KEY_DOWN`, `MOUSE`, `ON_CLICK` and the rest are all in [Graphics](12-graphics.md).
+Windows, drawing, text, images and input: `WINDOW`, `SHOW`, `CLEAR_WINDOW`, `RECT`, `CIRCLE`, `TEXT`, `IMAGE`, `DRAW`, `KEY_DOWN`, `MOUSE`, `ON_CLICK` and the rest are all in [Graphics](12-graphics.md).
 
 ## Errors and stopping
 

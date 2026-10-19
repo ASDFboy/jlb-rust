@@ -270,6 +270,44 @@ fn with_named(t: &Table, items: Vec<Value>) -> Value {
     Value::new_table(n)
 }
 
+/// CLEAR: wipes what's been printed. An editor (--ide, --debug, --repl) is sent a form
+/// feed and clears its output itself; a terminal gets the codes that clear its screen and
+/// scrollback. Output going to a file or another program is left alone.
+fn clear_output(it: &mut Interp) {
+    use std::io::IsTerminal;
+    if it.ide {
+        let _ = it.out.write_all(b"\x0c");
+    } else if std::io::stdout().is_terminal() {
+        let _ = it.out.flush();
+        windows_console_codes();
+        let _ = it.out.write_all(b"\x1b[H\x1b[2J\x1b[3J");
+    }
+    let _ = it.out.flush();
+}
+
+/// Windows consoles understand the clearing codes once asked to (Windows 10 and later).
+#[cfg(windows)]
+fn windows_console_codes() {
+    extern "system" {
+        fn GetStdHandle(n: u32) -> *mut std::ffi::c_void;
+        fn GetConsoleMode(h: *mut std::ffi::c_void, mode: *mut u32) -> i32;
+        fn SetConsoleMode(h: *mut std::ffi::c_void, mode: u32) -> i32;
+    }
+    const STD_OUTPUT_HANDLE: u32 = -11i32 as u32;
+    const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
+    // SAFETY: plain console calls on this process's own output handle.
+    unsafe {
+        let h = GetStdHandle(STD_OUTPUT_HANDLE);
+        let mut mode = 0;
+        if GetConsoleMode(h, &mut mode) != 0 && mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING == 0 {
+            SetConsoleMode(h, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn windows_console_codes() {}
+
 pub fn call(it: &mut Interp, name: &'static str, a: Vec<Value>) -> R<Value> {
     match name {
         "PRINT" => {
@@ -278,6 +316,13 @@ pub fn call(it: &mut Interp, name: &'static str, a: Vec<Value>) -> R<Value> {
             if it.ide {
                 let _ = it.out.flush();
             }
+            Ok(Value::Null)
+        }
+        "CLEAR" => {
+            if !a.is_empty() {
+                return err("CLEAR wipes what's been printed, so it takes no inputs. To fill a window with a color, use CLEAR_WINDOW(color)");
+            }
+            clear_output(it);
             Ok(Value::Null)
         }
         "NUM" => {

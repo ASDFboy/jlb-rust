@@ -131,6 +131,8 @@ Anything the snippet prints comes before the reply. Sending `␞RESET` clears ev
 
 `INPUT` works too: instead of printing its prompt, it prints `␞{"input":"the prompt"}` and reads the answer as the next line of input. The snippet then carries on.
 
+In `--ide`, `--debug` and `--repl`, `CLEAR()` prints a form feed character (code 12) instead of clearing a terminal: the editor removes everything shown before it.
+
 
 **`--debug`** runs like `--ide`, and the editor can also stop the program and look inside it. It starts by printing `␞{"event":"ready"}`, then waits for the editor to set breakpoints and say `continue` (or `step`, to stop at the first line).
 

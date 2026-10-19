@@ -932,7 +932,7 @@ fn style_table() -> Value {
 
 pub const NAMES: &[&str] = &[
     "WINDOW", "DRAW_TO", "SHOW", "FPS", "WINDOW_OPEN", "WINDOW_CLOSE", "WINDOW_TITLE", "WINDOW_RESIZE", "WINDOW_SET",
-    "STYLE", "RESET_STYLE", "RGB", "CLEAR", "PIXEL", "GET_PIXEL", "LINE", "LINES", "ARROW", "CURVE", "RECT", "CIRCLE",
+    "STYLE", "RESET_STYLE", "RGB", "CLEAR_WINDOW", "PIXEL", "GET_PIXEL", "LINE", "LINES", "ARROW", "CURVE", "RECT", "CIRCLE",
     "ELLIPSE", "TRIANGLE", "POLYGON", "NGON", "STAR", "ARC", "PIE", "FLOOD", "TEXT", "TEXT_SIZE", "FONT", "IMAGE",
     "IMAGE_NEW", "PART", "DRAW", "SAVE_IMAGE", "SCREENSHOT", "CAMERA", "KEY_DOWN", "KEY_PRESSED", "KEY_RELEASED",
     "KEYS_DOWN", "TYPED", "MOUSE", "MOUSE_PRESSED", "MOUSE_RELEASED", "ON_KEY", "ON_KEY_UP", "ON_CLICK",
@@ -1166,7 +1166,7 @@ pub fn call(it: &mut Interp, name: &'static str, mut a: Vec<Value>) -> R<Value> 
             let argb = (c[3] as u32) << 24 | (c[0] as u32) << 16 | (c[1] as u32) << 8 | c[2] as u32;
             Ok(num_val(unsafe { gfx_color_to_number(argb) }))
         }
-        "CLEAR" => {
+        "CLEAR_WINDOW" => {
             argc(name, a.len(), 0, 1)?;
             let c = if a.is_empty() { 0xFF000000 } else { color(name, &a[0])? };
             let opaque = it.gfx.draw_img.is_none();
