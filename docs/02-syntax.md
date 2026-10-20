@@ -84,9 +84,9 @@ REPEAT 3 { PRINT("Hello") }
 ```text
 IF  ELIF  ELSEIF  ELSE  WHILE  REPEAT  FOR  IN  TO  STEP  BREAK  SKIP
 DEF  RETURN  LOCAL  GLOBAL  CONST  START  TRY  FAIL  GOTO  POINT  IMPORT  LOAD  END
-TRUE  FALSE  NULL  UNDEFINE  INSERT  DROP
+TRUE  FALSE  NULL  UNDEFINE  INSERT  DROP  NUMBER  BOOL  TABLE  FUNCTION  TASK
 ```
 
-`FUNC` also works, as the older name for `DEF`.
+`FUNC` also works, as the older name for `DEF`. The type words make [typed variables](03-values-and-types.md#typed-variables) (`NUMBER score = 0`), along with `TEXT` (or `STRING`), `IMAGE`, `WINDOW` and `FONT`, which are also commands when followed by `(`.
 
 Every built-in command is listed in [Built-in commands](10-built-ins.md).

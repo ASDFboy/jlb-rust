@@ -53,6 +53,9 @@ pub enum StmtKind {
     Const(Rc<str>, Expr),
     /// GLOBAL before an assignment, FUNC or CONST: it's for the file's outside name.
     Global(Box<StmtKind>),
+    /// NUMBER score = 0 (or TEXT, TABLE ...): a variable that only takes that type. The
+    /// statement inside is `name`, `name = ...` (or another assignment), LOCAL or CONST.
+    Typed(&'static str, Box<StmtKind>),
     If(Vec<(Expr, Vec<Stmt>)>, Option<Vec<Stmt>>),
     While(Expr, Vec<Stmt>),
     Repeat(Expr, Vec<Stmt>),

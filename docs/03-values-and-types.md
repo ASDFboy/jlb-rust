@@ -16,6 +16,28 @@ PRINT(save_data)     >> NULL
 
 If the name already has a value, writing it by itself changes nothing. Inside a function it makes the function's own variable, like `LOCAL`.
 
+### Typed variables
+
+Put a type before a name to make a variable that only ever holds that type (or `NULL`). Giving it anything else is an error:
+
+```text
+NUMBER score = 0
+score += 10          >> fine
+score = "lots"       >> error: score is a NUMBER variable, so it can't hold a TEXT value
+score = NULL         >> fine: NULL is always allowed
+
+TEXT name = "Ann"    >> STRING name = "Ann" means the same
+TABLE inventory      >> starts as NULL, and only takes tables
+```
+
+- **The types** are `NUMBER`, `TEXT` (or `STRING`), `BOOL`, `TABLE`, `FUNCTION`, `TASK`, `IMAGE`, `WINDOW` and `FONT`, the same names `TYPE()` gives.
+- **Every way of changing it is checked:** `=`, `+=` and the others, and a name that shares it with `@` (`@=`, `DEF f(@n)`), so nothing can sneak the wrong type in.
+- **A name by itself** (`NUMBER score`) makes the variable holding `NULL`. If it already has a value, that value must already be the right type, and from then on the variable keeps to it.
+- **A variable keeps its type.** `TEXT score` after `NUMBER score` is an error. `UNDEFINE(score)` removes the variable, type and all.
+- **It works with the other words for making variables:** `LOCAL NUMBER tries = 0`, `GLOBAL NUMBER best = 0` and `CONST NUMBER max_hp = 100`.
+- **Copies don't keep the type.** `b = score` makes an ordinary variable, and so do function inputs that aren't shared with `@`.
+- **It's a safety check, not a speed-up.** Programs run at the same speed with or without types.
+
 ### Constants
 
 `CONST` gives a name a value that can never change:

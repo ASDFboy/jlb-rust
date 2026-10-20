@@ -32,7 +32,7 @@ pub struct LexError {
 pub const KEYWORDS: &[&str] = &[
     "IF", "ELIF", "ELSEIF", "ELSE", "WHILE", "REPEAT", "FOR", "IN", "TO", "STEP", "BREAK", "SKIP",
     "DEF", "RETURN", "LOCAL", "GLOBAL", "CONST", "START", "TRY", "FAIL", "GOTO", "POINT", "IMPORT", "LOAD", "END", "TRUE",
-    "FALSE", "NULL", "UNDEFINE", "INSERT", "DROP",
+    "FALSE", "NULL", "UNDEFINE", "INSERT", "DROP", "NUMBER", "BOOL", "TABLE", "FUNCTION", "TASK",
 ];
 
 pub const BUILTINS: &[&str] = &[
@@ -56,6 +56,10 @@ pub fn find_word(w: &str) -> Option<&'static str> {
     // FUNC is the older name for DEF, and still works.
     if w == "FUNC" {
         return Some("DEF");
+    }
+    // STRING is another name for TEXT (in NUMBER/TEXT/... variable types).
+    if w == "STRING" {
+        return Some("TEXT");
     }
     KEYWORDS.iter().chain(BUILTINS.iter()).chain(crate::graphics::NAMES.iter()).find(|k| **k == w).copied()
 }

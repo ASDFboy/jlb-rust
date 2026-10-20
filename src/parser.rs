@@ -152,8 +152,33 @@ impl Parser {
         b
     }
 
+    /// NUMBER, TEXT, TABLE ... right before a variable's name.
+    fn type_word(&self) -> Option<&'static str> {
+        match (self.peek(), self.peek_at(1)) {
+            (Tok::Kw(k), Tok::Name(_)) if crate::interp::TYPE_WORDS.contains(k) => Some(k),
+            _ => None,
+        }
+    }
+
+    /// After NUMBER (or another type): `name`, or `name = ...` and the other assignments.
+    fn typed_rest(&mut self, ty: &'static str) -> PR<StmtKind> {
+        let name = match self.peek() {
+            Tok::Name(n) => n.clone(),
+            _ => unreachable!(),
+        };
+        match self.expr_or_assign()? {
+            k @ (StmtKind::Expr(Expr::Var(_)) | StmtKind::Assign(Expr::Var(_), _, _)) => Ok(StmtKind::Typed(ty, Box::new(k))),
+            _ => self.fail(format!("{} goes before a variable's name: {} {} or {} {} = ...", ty, ty, name, ty, name)),
+        }
+    }
+
     fn statement(&mut self) -> PR<Stmt> {
         let line = self.line();
+        if let Some(ty) = self.type_word() {
+            self.advance();
+            let kind = self.typed_rest(ty)?;
+            return Ok(Stmt { kind, line });
+        }
         let kind = match self.peek().clone() {
             Tok::Kw(k) => match k {
                 "IF" => self.if_stmt()?,
@@ -183,6 +208,9 @@ impl Parser {
                         StmtKind::FuncDef(self.func_rest(Some(name))?)
                     } else if self.is_kw("CONST") {
                         self.const_stmt()?
+                    } else if let Some(ty) = self.type_word() {
+                        self.advance();
+                        self.typed_rest(ty)?
                     } else {
                         let name = match self.peek() {
                             Tok::Name(n) => n.clone(),
@@ -238,6 +266,10 @@ impl Parser {
                         return self.fail("LOCAL can only be used inside a function");
                     }
                     self.advance();
+                    let ty = self.type_word();
+                    if ty.is_some() {
+                        self.advance();
+                    }
                     let name = self.expect_name("a variable name after LOCAL")?;
                     let v = if self.is_op("=") {
                         self.advance();
@@ -245,7 +277,10 @@ impl Parser {
                     } else {
                         None
                     };
-                    StmtKind::Local(name, v)
+                    match ty {
+                        Some(t) => StmtKind::Typed(t, Box::new(StmtKind::Local(name, v))),
+                        None => StmtKind::Local(name, v),
+                    }
                 }
                 "CONST" => self.const_stmt()?,
                 "TRY" => {
@@ -295,12 +330,20 @@ impl Parser {
 
     fn const_stmt(&mut self) -> PR<StmtKind> {
         self.advance();
+        let ty = self.type_word();
+        if ty.is_some() {
+            self.advance();
+        }
         let name = self.expect_name("a name after CONST")?;
         if !self.is_op("=") {
             return self.fail(&format!("CONST {} needs a value: CONST {} = ...", name, name));
         }
         self.advance();
-        Ok(StmtKind::Const(name, self.expr()?))
+        let k = StmtKind::Const(name, self.expr()?);
+        Ok(match ty {
+            Some(t) => StmtKind::Typed(t, Box::new(k)),
+            None => k,
+        })
     }
 
     fn expr_or_assign(&mut self) -> PR<StmtKind> {

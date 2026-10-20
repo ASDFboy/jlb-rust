@@ -179,6 +179,7 @@ fn set_entry(bs: &Slot, key: &Key, v: Value) -> R<()> {
                 Key::Name(n) => {
                     if let Some(s) = t.named.get(n) {
                         not_const(s)?;
+                        type_ok(s, &v, n)?;
                         *s.borrow_mut() = v;
                     } else {
                         t.named.insert(n.clone(), new_slot(v));
@@ -189,6 +190,7 @@ fn set_entry(bs: &Slot, key: &Key, v: Value) -> R<()> {
                     let len = t.items.len();
                     if let Some(i) = resolve(*p, len) {
                         not_const(&t.items[i])?;
+                        type_ok(&t.items[i], &v, &format!("position {}", p))?;
                         *t.items[i].borrow_mut() = v;
                         return Ok(());
                     }
@@ -251,6 +253,48 @@ fn set_entry_slot(bs: &Slot, key: &Key, sh: Slot) -> R<()> {
             }
         }
         o => err(format!("@= can only share into a table, not a {}", o.type_name())),
+    }
+}
+
+/// The types a variable can be declared with (NUMBER score = 0). STRING means TEXT.
+pub const TYPE_WORDS: &[&str] = &["NUMBER", "TEXT", "BOOL", "TABLE", "FUNCTION", "TASK", "IMAGE", "WINDOW", "FONT"];
+
+fn a_an(t: &str) -> &'static str {
+    if t.starts_with(['A', 'E', 'I', 'O', 'U']) {
+        "an"
+    } else {
+        "a"
+    }
+}
+
+/// Whether `v` can go in a variable declared as `ty` (NULL always can).
+fn fits(ty: &str, v: &Value, name: &str) -> R<()> {
+    if matches!(v, Value::Null) || v.type_name() == ty {
+        return Ok(());
+    }
+    let vt = v.type_name();
+    err(format!("{} is {} {} variable, so it can't hold {} {} value", name, a_an(ty), ty, a_an(vt), vt))
+}
+
+/// A typed variable only takes values of its type.
+fn type_ok(s: &Slot, v: &Value, name: &str) -> R<()> {
+    match s.ty() {
+        Some(t) => fits(t, v, name),
+        None => Ok(()),
+    }
+}
+
+/// `a @= b` when `a` was declared with a type: b's value must fit, and the variable
+/// they now both name keeps that type.
+fn share_type(old: &Slot, new: &Slot, name: &str) -> R<()> {
+    let Some(t) = old.ty() else { return Ok(()) };
+    type_ok(old, &new.borrow(), name)?;
+    match new.ty() {
+        Some(u) if u != t => err(format!("{} is {} {} variable, so it can't share {} {} variable", name, a_an(t), t, a_an(u), u)),
+        _ => {
+            new.set_ty(Some(t));
+            Ok(())
+        }
     }
 }
 
@@ -626,6 +670,7 @@ impl Interp {
         match self.lookup_own(name) {
             Some(s) => {
                 const_name(&s, name)?;
+                type_ok(&s, &v, name)?;
                 *s.borrow_mut() = v;
             }
             None => self.create_var(name.clone(), new_slot(v)),
@@ -636,6 +681,7 @@ impl Interp {
     fn bind_var(&mut self, name: &Rc<str>, s: Slot) -> R<()> {
         if let Some(old) = self.lookup_own(name) {
             const_name(&old, name)?;
+            share_type(&old, &s, name)?;
         }
         let f = self.frame_mut();
         for sc in f.scopes.iter_mut().rev() {
@@ -655,9 +701,114 @@ impl Interp {
 
     /// GLOBAL name = ..., GLOBAL FUNC name, GLOBAL CONST name: the file's outside name,
     /// even inside a function.
+    /// NUMBER score = 0 and the like: the variable takes only that type (and NULL).
+    fn exec_typed(&mut self, ty: &'static str, k: &StmtKind, global: bool) -> R<()> {
+        let env = self.frame().env.clone();
+        match k {
+            StmtKind::Local(n, e) => {
+                let v = match e {
+                    Some(e) => copy_val(self.eval(e)?),
+                    None => Value::Null,
+                };
+                fits(ty, &v, n)?;
+                let s = new_slot(v);
+                s.set_ty(Some(ty));
+                self.frame_mut().scopes[0].insert(n.clone(), s);
+                Ok(())
+            }
+            StmtKind::Const(n, e) => {
+                let exists = if global { env.borrow().get(n).is_some() } else { false };
+                if exists {
+                    return err(format!(
+                        "{} already has an outside value, so CONST can't make it a constant. Use CONST where {} first gets its value",
+                        n, n
+                    ));
+                }
+                let v = self.eval(e)?;
+                fits(ty, &v, n)?;
+                if global {
+                    env.borrow_mut().insert(n.clone(), const_slot(v));
+                    Ok(())
+                } else {
+                    self.make_const(n, v)
+                }
+            }
+            StmtKind::Expr(Expr::Var(n)) | StmtKind::Assign(Expr::Var(n), _, _) => {
+                let old = if global { env.borrow().get(n).cloned() } else { self.lookup_own(n) };
+                if let Some(t) = old.as_ref().and_then(|s| s.ty()) {
+                    if t != ty {
+                        return err(format!("{} is already {} {} variable, so it can't become {} {} one", n, a_an(t), t, a_an(ty), ty));
+                    }
+                }
+                let fresh = |v: Value| {
+                    let s = new_slot(v);
+                    s.set_ty(Some(ty));
+                    s
+                };
+                let make = |this: &mut Self, s: Slot| {
+                    if global {
+                        env.borrow_mut().insert(n.clone(), s);
+                    } else {
+                        this.create_var(n.clone(), s);
+                    }
+                };
+                match k {
+                    // NUMBER score: makes it (NULL) or gives an existing one its type.
+                    StmtKind::Expr(_) => match old {
+                        Some(s) => {
+                            let cur = s.borrow().clone();
+                            if !matches!(cur, Value::Null) && cur.type_name() != ty {
+                                return err(format!("{} already holds {} {} value, so it can't be {} {} variable", n, a_an(cur.type_name()), cur.type_name(), a_an(ty), ty));
+                            }
+                            s.set_ty(Some(ty));
+                            Ok(())
+                        }
+                        None => {
+                            make(self, fresh(Value::Null));
+                            Ok(())
+                        }
+                    },
+                    StmtKind::Assign(_, "=", rhs) => {
+                        let v = copy_val(self.eval(rhs)?);
+                        fits(ty, &v, n)?;
+                        match old {
+                            Some(s) => {
+                                const_name(&s, n)?;
+                                *s.borrow_mut() = v;
+                                s.set_ty(Some(ty));
+                            }
+                            None => make(self, fresh(v)),
+                        }
+                        Ok(())
+                    }
+                    StmtKind::Assign(target, op, rhs) => {
+                        // @= and += and the rest: the variable gets its type first, then
+                        // the usual assignment checks the value.
+                        match &old {
+                            Some(s) => {
+                                fits(ty, &s.borrow(), n)?;
+                                s.set_ty(Some(ty));
+                            }
+                            None if *op == "@=" => make(self, fresh(Value::Null)),
+                            None => {}
+                        }
+                        if global {
+                            self.exec_global(k)
+                        } else {
+                            self.assign(target, op, rhs)
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => err("a type (like NUMBER) goes before a variable's name"),
+        }
+    }
+
     fn exec_global(&mut self, k: &StmtKind) -> R<()> {
         let env = self.frame().env.clone();
         match k {
+            StmtKind::Typed(ty, inner) => self.exec_typed(ty, inner, true),
             // GLOBAL name by itself: the outside name, made with NULL if it has no value yet.
             StmtKind::Expr(Expr::Var(n)) => {
                 if env.borrow().get(n).is_none() {
@@ -674,7 +825,10 @@ impl Interp {
                     "=" => {
                         let v = copy_val(self.eval(rhs)?);
                         match old {
-                            Some(s) => *s.borrow_mut() = v,
+                            Some(s) => {
+                                type_ok(&s, &v, n)?;
+                                *s.borrow_mut() = v
+                            }
                             None => {
                                 env.borrow_mut().insert(n.clone(), new_slot(v));
                             }
@@ -683,13 +837,16 @@ impl Interp {
                     }
                     "@=" => {
                         let s = self.share_slot(rhs)?;
+                        if let Some(o) = &old {
+                            share_type(o, &s, n)?;
+                        }
                         env.borrow_mut().insert(n.clone(), s);
                         Ok(())
                     }
                     _ => {
                         let Some(slot) = old else { return err(format!("{} has no outside value yet, so GLOBAL {} {} can't change it", n, n, op)) };
                         let r = self.eval(rhs)?;
-                        self.compound(&slot, op, r)
+                        self.compound(&slot, op, r, n)
                     }
                 }
             }
@@ -701,7 +858,10 @@ impl Interp {
                 let f = self.make_func(d);
                 let old = env.borrow().get(&name).cloned();
                 match old {
-                    Some(s) => *s.borrow_mut() = f,
+                    Some(s) => {
+                        type_ok(&s, &f, &name)?;
+                        *s.borrow_mut() = f
+                    }
                     None => {
                         env.borrow_mut().insert(name, new_slot(f));
                     }
@@ -856,6 +1016,10 @@ impl Interp {
             }
             StmtKind::Global(k) => {
                 self.exec_global(k)?;
+                Ok(Flow::Normal)
+            }
+            StmtKind::Typed(ty, k) => {
+                self.exec_typed(ty, k, false)?;
                 Ok(Flow::Normal)
             }
             StmtKind::Local(name, e) => {
@@ -1170,7 +1334,7 @@ impl Interp {
                 };
                 const_name(&slot, n)?;
                 let r = self.eval(rhs)?;
-                self.compound(&slot, op, r)
+                self.compound(&slot, op, r, n)
             }
             Expr::Field(b, k) => {
                 let bs = self.lvalue_slot(b)?;
@@ -1185,7 +1349,7 @@ impl Interp {
         }
     }
 
-    fn compound(&mut self, slot: &Slot, op: &str, r: Value) -> R<()> {
+    fn compound(&mut self, slot: &Slot, op: &str, r: Value, name: &str) -> R<()> {
         not_const(slot)?;
         let base = &op[..op.len() - 1];
         // Fast path: `table += value` adds to the end in place.
@@ -1198,6 +1362,7 @@ impl Interp {
         }
         let cur = slot.borrow().clone();
         let nv = ops::binop(base, cur, r)?;
+        type_ok(slot, &nv, name)?;
         *slot.borrow_mut() = nv;
         Ok(())
     }
@@ -1212,11 +1377,12 @@ impl Interp {
             const_name(&s, &n)?;
             if op == "=" || op == "@=" {
                 let v = copy_val(self.eval(rhs)?);
+                type_ok(&s, &v, &n)?;
                 *s.borrow_mut() = v;
                 return Ok(());
             }
             let r = self.eval(rhs)?;
-            return self.compound(&s, op, r);
+            return self.compound(&s, op, r, &n);
         }
         if op == "@=" {
             let sh = self.share_slot(rhs)?;

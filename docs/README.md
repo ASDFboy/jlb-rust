@@ -38,6 +38,7 @@ BREAK  SKIP  GOTO name  POINT name  END
 DEF name(a, b = 1, @shared, ...rest) { RETURN a }
 LOCAL x = 0      name.x            DEF(x) { RETURN x * 2 }
 CONST max = 10                     a name that can never change
+NUMBER score = 0                   a variable that only holds numbers (TEXT, TABLE, BOOL ...)
 GLOBAL x = 1                       in a function: the outside x (names are local there otherwise)
 t = START f(x)    AWAIT(t)         run f(x) side by side, then wait for its result
 TRY { } FAIL err { }               ERROR("message")

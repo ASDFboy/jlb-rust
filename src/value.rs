@@ -16,6 +16,8 @@ pub type Slot = Rc<SlotData>;
 pub struct SlotData {
     v: RefCell<Value>,
     constant: Cell<bool>,
+    /// The type a variable was declared with (NUMBER score), if any.
+    ty: Cell<Option<&'static str>>,
 }
 
 impl SlotData {
@@ -28,19 +30,25 @@ impl SlotData {
     pub fn is_const(&self) -> bool {
         self.constant.get()
     }
+    pub fn ty(&self) -> Option<&'static str> {
+        self.ty.get()
+    }
+    pub fn set_ty(&self, t: Option<&'static str>) {
+        self.ty.set(t)
+    }
 }
 /// A file's global variables.
 pub type Env = Rc<RefCell<OrdMap>>;
 
 pub fn new_slot(v: Value) -> Slot {
-    Rc::new(SlotData { v: RefCell::new(v), constant: Cell::new(false) })
+    Rc::new(SlotData { v: RefCell::new(v), constant: Cell::new(false), ty: Cell::new(None) })
 }
 
 /// A constant slot holding a frozen copy of `v`: its tables (and the tables inside
 /// them) are copied into constant slots of their own, so nothing shared with an
 /// ordinary variable gets frozen.
 pub fn const_slot(v: Value) -> Slot {
-    Rc::new(SlotData { v: RefCell::new(freeze(v)), constant: Cell::new(true) })
+    Rc::new(SlotData { v: RefCell::new(freeze(v)), constant: Cell::new(true), ty: Cell::new(None) })
 }
 
 fn freeze(v: Value) -> Value {
