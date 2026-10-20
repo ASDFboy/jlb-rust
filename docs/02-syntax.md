@@ -87,6 +87,6 @@ DEF  RETURN  LOCAL  GLOBAL  CONST  START  TRY  FAIL  GOTO  POINT  IMPORT  LOAD  
 TRUE  FALSE  NULL  UNDEFINE  INSERT  DROP  NUMBER  BOOL  TABLE  FUNCTION  TASK
 ```
 
-`FUNC` also works, as the older name for `DEF`. The type words make [typed variables](03-values-and-types.md#typed-variables) (`NUMBER score = 0`), along with `TEXT` (or `STRING`), `IMAGE`, `WINDOW` and `FONT`, which are also commands when followed by `(`.
+`FUNC` also works, as the older name for `DEF`. The type words make [typed variables](03-values-and-types.md#typed-variables) (`NUMBER score = 0`), along with `TEXT` (or `STRING` or `STR`), `IMAGE`, `WINDOW` and `FONT`, which are also commands when followed by `(` (`STR(5)` still turns 5 into text). `RTRN` is short for `RETURN`, and `AND`, `OR`, `NAND`, `NOR`, `XOR` and `XNOR` can be written instead of `&&`, `||`, `!&&`, `!||`, `~` and `!~` (see [Logic](04-operators.md#logic)).
 
 Every built-in command is listed in [Built-in commands](10-built-ins.md).

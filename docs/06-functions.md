@@ -10,6 +10,7 @@ PRINT(add(2, 3))      >> 5
 ```
 
 - **`DEF` makes a function.** `FUNC`, its older name, still works the same way.
+- **`RTRN` is short for `RETURN`,** and works the same way.
 - **A function without `RETURN` gives `NULL`.**
 - **`RETURN` can only be used inside a function.**
 - **Functions are defined in order as the file runs,** so calling one before its `DEF` line has run is an error. A function can still call another function defined further down, as long as that one exists by the time the call actually happens.
@@ -112,6 +113,25 @@ greet()                    >> error: name is required
 ```
 
 Optional inputs go after the required ones. Passing too many inputs is an error. Passing `NULL` skips an input in the middle, for built-in commands too: `RANDOM(1, 10, NULL, 42)`.
+
+### Typed inputs
+
+Put a type before an input to say what it must be, just like a [typed variable](03-values-and-types.md#typed-variables):
+
+```text
+DEF save(TEXT file, TABLE data) {
+    file += ".txt"           >> fine: still text
+    WRITE(file, data)
+}
+save("slot1", [level: 2])
+save(5, [level: 2])          >> error: file is a TEXT input of save, so it can't be given a NUMBER value
+```
+
+- **The value is checked when the function is called,** and the input stays typed inside the function, so `file = 5` in there is an error too.
+- **`NULL` is allowed,** and so is leaving out an optional input. Defaults are checked as well: `DEF greet(TEXT name, NUMBER times = 1)`.
+- **`STR` and `STRING` work for `TEXT` here too:** `DEF hello(STR who)`.
+- **With `@`, write the type first:** `DEF lose_life(NUMBER @lives)` (`@NUMBER lives` works too). The caller's variable is only held to that type while the function runs.
+- **`...rest` can't have a type,** since it always collects a table.
 
 ### Any number of inputs
 

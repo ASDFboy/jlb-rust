@@ -33,6 +33,8 @@ pub struct Param {
     pub shared: bool,
     pub rest: bool,
     pub default: Option<Expr>,
+    /// DEF f(NUMBER n): the type the input must have (NULL is always allowed).
+    pub ty: Option<&'static str>,
 }
 
 pub struct FuncDecl {

@@ -28,7 +28,7 @@ TRUE  FALSE  NULL
 + - * / ^ !^ % !%                  math (also text and table tricks)
 == === !== !===                    loose and strict equality
 < > <= >= <== >==                  comparisons
-& && !& !&&  | || !| !||  ~ !~  !  logic
+& && !& !&&  | || !| !||  ~ !~  !  logic (or AND OR NAND NOR XOR XNOR)
 
 IF c { } ELIF c { } ELSE { }
 WHILE c { }      REPEAT n { }
@@ -36,6 +36,7 @@ FOR x IN t { }   FOR k, v IN t { }   FOR i IN 1 TO 10 STEP 2 { }
 BREAK  SKIP  GOTO name  POINT name  END
 
 DEF name(a, b = 1, @shared, ...rest) { RETURN a }
+DEF save(TEXT file, TABLE data) { }    inputs that must be TEXT, TABLE ...
 LOCAL x = 0      name.x            DEF(x) { RETURN x * 2 }
 CONST max = 10                     a name that can never change
 NUMBER score = 0                   a variable that only holds numbers (TEXT, TABLE, BOOL ...)

@@ -259,6 +259,15 @@ fn set_entry_slot(bs: &Slot, key: &Key, sh: Slot) -> R<()> {
 /// The types a variable can be declared with (NUMBER score = 0). STRING means TEXT.
 pub const TYPE_WORDS: &[&str] = &["NUMBER", "TEXT", "BOOL", "TABLE", "FUNCTION", "TASK", "IMAGE", "WINDOW", "FONT"];
 
+/// The type a word names before a variable: NUMBER, TEXT ..., and STR (STR( is the
+/// conversion command) and STRING mean TEXT.
+pub fn type_named(k: &str) -> Option<&'static str> {
+    if k == "STR" || k == "STRING" {
+        return Some("TEXT");
+    }
+    TYPE_WORDS.iter().find(|t| **t == k).copied()
+}
+
 fn a_an(t: &str) -> &'static str {
     if t.starts_with(['A', 'E', 'I', 'O', 'U']) {
         "an"
@@ -1671,7 +1680,9 @@ impl Interp {
         r
     }
 
-    pub fn run_call(&mut self, func: &Rc<Function>, decl: &FuncDecl, vals: Vec<Slot>) -> R<Value> {
+    /// Puts a call's inputs in the new frame (checking typed ones). Shared (@) inputs typed
+    /// only for this call are listed in `typed_for_call`, to be untyped when it ends.
+    fn bind_inputs(&mut self, func: &Rc<Function>, decl: &FuncDecl, vals: Vec<Slot>, typed_for_call: &mut Vec<Slot>) -> R<()> {
         let mut it = vals.into_iter();
         for p in &decl.params {
             if p.rest {
@@ -1692,10 +1703,49 @@ impl Interp {
             } else {
                 return err(format!("{} is required (it's an input of {})", p.name, fname(func)));
             };
+            if let Some(ty) = p.ty {
+                let v = slot.borrow().clone();
+                if !matches!(v, Value::Null) && v.type_name() != ty {
+                    let vt = v.type_name();
+                    return err(format!(
+                        "{} is {} {} input of {}, so it can't be given {} {} value",
+                        p.name,
+                        a_an(ty),
+                        ty,
+                        func.decl.name.as_deref().unwrap_or("this function"),
+                        a_an(vt),
+                        vt
+                    ));
+                }
+                match slot.ty() {
+                    Some(t) if t != ty => {
+                        return err(format!("{} is {} {} input of {}, so it can't share {} {} variable", p.name, a_an(ty), ty, func.decl.name.as_deref().unwrap_or("this function"), a_an(t), t))
+                    }
+                    Some(_) => {}
+                    None => {
+                        slot.set_ty(Some(ty));
+                        // A shared (@) input is the caller's own variable: it's only typed during the call.
+                        if p.shared {
+                            typed_for_call.push(slot.clone());
+                        }
+                    }
+                }
+            }
             self.frame_mut().scopes[0].insert(p.name.clone(), slot);
         }
-        let body = decl.body.clone();
-        match self.exec_block(&body)? {
+        Ok(())
+    }
+
+    pub fn run_call(&mut self, func: &Rc<Function>, decl: &FuncDecl, vals: Vec<Slot>) -> R<Value> {
+        let mut typed_for_call: Vec<Slot> = Vec::new();
+        let r = self.bind_inputs(func, decl, vals, &mut typed_for_call).and_then(|_| {
+            let body = decl.body.clone();
+            self.exec_block(&body)
+        });
+        for s in typed_for_call {
+            s.set_ty(None);
+        }
+        match r? {
             Flow::Return(v) => Ok(v),
             Flow::Goto(n, line) => Err(self.goto_error(&n, line)),
             _ => Ok(Value::Null),

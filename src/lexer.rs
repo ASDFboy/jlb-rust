@@ -52,10 +52,27 @@ const OPS: &[&str] = &[
     ".", ":", ";",
 ];
 
+/// Logic operators written as words: AND means &&, OR means ||, and so on.
+pub fn word_op(w: &str) -> Option<&'static str> {
+    Some(match w {
+        "AND" => "&&",
+        "OR" => "||",
+        "NAND" => "!&&",
+        "NOR" => "!||",
+        "XOR" => "~",
+        "XNOR" => "!~",
+        _ => return None,
+    })
+}
+
 pub fn find_word(w: &str) -> Option<&'static str> {
     // FUNC is the older name for DEF, and still works.
     if w == "FUNC" {
         return Some("DEF");
+    }
+    // RTRN is short for RETURN.
+    if w == "RTRN" {
+        return Some("RETURN");
     }
     // STRING is another name for TEXT (in NUMBER/TEXT/... variable types).
     if w == "STRING" {
@@ -251,8 +268,8 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
             let upper = word.chars().any(|x| x.is_ascii_uppercase());
             let lower = word.chars().any(|x| x.is_ascii_lowercase());
             let tok = if upper && !lower {
-                match find_word(&word) {
-                    Some(k) => Tok::Kw(k),
+                match word_op(&word).map(Tok::Op).or_else(|| find_word(&word).map(Tok::Kw)) {
+                    Some(t) => t,
                     None => {
                         return fail(
                             format!("{} isn't a command .jlb knows (your own names must be lowercase)", word),
@@ -262,7 +279,7 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
                 }
             } else if upper {
                 let up = word.to_ascii_uppercase();
-                if find_word(&up).is_some() {
+                if find_word(&up).is_some() || word_op(&up).is_some() {
                     return fail(format!("did you mean {}? Built-in commands are written in ALL CAPS", up), line);
                 }
                 return fail(

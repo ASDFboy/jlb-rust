@@ -155,7 +155,7 @@ impl Parser {
     /// NUMBER, TEXT, TABLE ... right before a variable's name.
     fn type_word(&self) -> Option<&'static str> {
         match (self.peek(), self.peek_at(1)) {
-            (Tok::Kw(k), Tok::Name(_)) if crate::interp::TYPE_WORDS.contains(k) => Some(k),
+            (Tok::Kw(k), Tok::Name(_)) => crate::interp::type_named(k),
             _ => None,
         }
     }
@@ -447,12 +447,30 @@ impl Parser {
             } else {
                 false
             };
+            // A type can come before the name: DEF f(TEXT name, NUMBER @lives) (or @NUMBER lives).
+            let input_type = |this: &Self| match (this.peek(), this.peek_at(1)) {
+                (Tok::Kw(k), Tok::Name(_) | Tok::Op("@")) => crate::interp::type_named(k),
+                _ => None,
+            };
+            let mut ty = input_type(self);
+            if ty.is_some() {
+                self.advance();
+            }
             let shared = if self.is_op("@") {
                 self.advance();
                 true
             } else {
                 false
             };
+            if ty.is_none() {
+                ty = input_type(self);
+                if ty.is_some() {
+                    self.advance();
+                }
+            }
+            if rest && ty.is_some() {
+                return self.fail("an input with ... always collects a table, so it can't have a type");
+            }
             let pname = self.expect_name("an input name")?;
             let default = if self.is_op("=") {
                 self.advance();
@@ -472,7 +490,7 @@ impl Parser {
             if !rest && default.is_none() && params.iter().any(|p| p.default.is_some()) {
                 return self.fail("required inputs must come before optional ones");
             }
-            params.push(Param { name: pname, shared, rest, default });
+            params.push(Param { name: pname, shared, rest, default, ty });
             if self.is_op(",") {
                 self.advance();
             } else if !self.is_op(")") {

@@ -26,16 +26,17 @@ score += 10          >> fine
 score = "lots"       >> error: score is a NUMBER variable, so it can't hold a TEXT value
 score = NULL         >> fine: NULL is always allowed
 
-TEXT name = "Ann"    >> STRING name = "Ann" means the same
+TEXT name = "Ann"    >> STRING name = "Ann" and STR name = "Ann" mean the same
 TABLE inventory      >> starts as NULL, and only takes tables
 ```
 
-- **The types** are `NUMBER`, `TEXT` (or `STRING`), `BOOL`, `TABLE`, `FUNCTION`, `TASK`, `IMAGE`, `WINDOW` and `FONT`, the same names `TYPE()` gives.
+- **The types** are `NUMBER`, `TEXT` (or `STRING` or `STR`), `BOOL`, `TABLE`, `FUNCTION`, `TASK`, `IMAGE`, `WINDOW` and `FONT`, the same names `TYPE()` gives.
 - **Every way of changing it is checked:** `=`, `+=` and the others, and a name that shares it with `@` (`@=`, `DEF f(@n)`), so nothing can sneak the wrong type in.
 - **A name by itself** (`NUMBER score`) makes the variable holding `NULL`. If it already has a value, that value must already be the right type, and from then on the variable keeps to it.
 - **A variable keeps its type.** `TEXT score` after `NUMBER score` is an error. `UNDEFINE(score)` removes the variable, type and all.
 - **It works with the other words for making variables:** `LOCAL NUMBER tries = 0`, `GLOBAL NUMBER best = 0` and `CONST NUMBER max_hp = 100`.
 - **Copies don't keep the type.** `b = score` makes an ordinary variable, and so do function inputs that aren't shared with `@`.
+- **Function inputs can have types too:** `DEF save(TEXT file, TABLE data)` (see [typed inputs](06-functions.md#typed-inputs)).
 - **It's a safety check, not a speed-up.** Programs run at the same speed with or without types.
 
 ### Constants

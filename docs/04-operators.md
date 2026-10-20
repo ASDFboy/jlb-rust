@@ -107,19 +107,21 @@ NULL == 0       >> TRUE
 
 Every logic operator reads its values with the [truth rules](03-values-and-types.md#the-truth-rules) and gives `TRUE` or `FALSE`.
 
-| Operator | Meaning | Checks both sides? |
-| --- | --- | --- |
-| `!x` | NOT | |
-| `&` | AND | only if needed |
-| `&&` | AND | always |
-| `!&` | NOT AND (true unless both are true) | only if needed |
-| `!&&` | NOT AND | always |
-| `\|` | OR | only if needed |
-| `\|\|` | OR | always |
-| `!\|` | NOT OR (true only if both are false) | only if needed |
-| `!\|\|` | NOT OR | always |
-| `~` | XOR (true if exactly one is true) | always |
-| `!~` | XNOR (true if both match) | always |
+| Operator | Or write | Meaning | Checks both sides? |
+| --- | --- | --- | --- |
+| `!x` | | NOT | |
+| `&` | | AND | only if needed |
+| `&&` | `AND` | AND | always |
+| `!&` | | NOT AND (true unless both are true) | only if needed |
+| `!&&` | `NAND` | NOT AND | always |
+| `\|` | | OR | only if needed |
+| `\|\|` | `OR` | OR | always |
+| `!\|` | | NOT OR (true only if both are false) | only if needed |
+| `!\|\|` | `NOR` | NOT OR | always |
+| `~` | `XOR` | XOR (true if exactly one is true) | always |
+| `!~` | `XNOR` | XNOR (true if both match) | always |
+
+The words mean exactly the same as the symbols next to them: `a AND b` is `a && b`, so it checks both sides too.
 
 One symbol checks one side when it can; two symbols always check two sides. The single-symbol versions make safe checks possible:
 
@@ -128,6 +130,7 @@ IF enemy !== NULL & enemy.health > 0 {   >> safe even when there's no enemy
     attack(enemy)
 }
 IF ready && log_check() { }              >> log_check() runs every time
+IF ready AND log_check() { }             >> the same
 ```
 
 This is the reverse of C and JavaScript, where `&&` is the one that stops early.
