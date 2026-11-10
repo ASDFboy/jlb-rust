@@ -61,6 +61,7 @@ pub fn word_op(w: &str) -> Option<&'static str> {
         "NOR" => "!||",
         "XOR" => "~",
         "XNOR" => "!~",
+        "NOT" => "!",
         _ => return None,
     })
 }

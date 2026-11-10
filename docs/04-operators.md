@@ -109,7 +109,7 @@ Every logic operator reads its values with the [truth rules](03-values-and-types
 
 | Operator | Or write | Meaning | Checks both sides? |
 | --- | --- | --- | --- |
-| `!x` | | NOT | |
+| `!x` | `NOT x` | NOT | |
 | `&` | | AND | only if needed |
 | `&&` | `AND` | AND | always |
 | `!&` | | NOT AND (true unless both are true) | only if needed |
@@ -121,7 +121,7 @@ Every logic operator reads its values with the [truth rules](03-values-and-types
 | `~` | `XOR` | XOR (true if exactly one is true) | always |
 | `!~` | `XNOR` | XNOR (true if both match) | always |
 
-The words mean exactly the same as the symbols next to them: `a AND b` is `a && b`, so it checks both sides too.
+The words mean exactly the same as the symbols next to them: `a AND b` is `a && b`, so it checks both sides too, and `NOT done` is `!done`.
 
 One symbol checks one side when it can; two symbols always check two sides. The single-symbol versions make safe checks possible:
 

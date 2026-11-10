@@ -28,7 +28,7 @@ TRUE  FALSE  NULL
 + - * / ^ !^ % !%                  math (also text and table tricks)
 == === !== !===                    loose and strict equality
 < > <= >= <== >==                  comparisons
-& && !& !&&  | || !| !||  ~ !~  !  logic (or AND OR NAND NOR XOR XNOR)
+& && !& !&&  | || !| !||  ~ !~  !  logic (or AND OR NAND NOR XOR XNOR NOT)
 
 IF c { } ELIF c { } ELSE { }
 WHILE c { }      REPEAT n { }
